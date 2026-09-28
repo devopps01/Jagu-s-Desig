@@ -1,0 +1,106 @@
+.jagu-mark {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+  text-decoration: none;
+  color: inherit;
+  margin: 0;
+}
+
+.jagu-mark--left {
+  align-items: flex-start;
+}
+
+.jagu-mark__script {
+  position: relative;
+  font-size: 2.65rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  background: linear-gradient(180deg, #ee4b9a 0%, #c2185b 52%, #9b1248 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: #c2185b;
+}
+
+.jagu-mark__heart {
+  position: absolute;
+  right: -0.55em;
+  top: -0.12em;
+  font-size: 0.38em;
+  background: none;
+  -webkit-text-fill-color: #e91e8c;
+  color: #e91e8c;
+  line-height: 1;
+}
+
+.jagu-mark__title {
+  margin-top: 0.08em;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #1c1c1c;
+}
+
+.jagu-mark__rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  width: 100%;
+  max-width: 168px;
+}
+
+.jagu-mark__rule::before,
+.jagu-mark__rule::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #c9a227, #c9a227);
+}
+
+.jagu-mark__rule::after {
+  background: linear-gradient(90deg, #c9a227, #c9a227, transparent);
+}
+
+.jagu-mark__lotus {
+  color: #e2186d;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.jagu-mark__sub {
+  margin-top: 6px;
+  font-size: 0.68rem;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: #2a2a2a;
+}
+
+.jagu-mark__tag {
+  margin-top: 4px;
+  font-size: 0.55rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #b3943a;
+}
+
+.jagu-mark--compact .jagu-mark__script {
+  font-size: 1.7rem;
+}
+
+.jagu-mark--compact .jagu-mark__title {
+  font-size: 0.92rem;
+}
+
+.jagu-mark--compact .jagu-mark__rule,
+.jagu-mark--compact .jagu-mark__sub,
+.jagu-mark--compact .jagu-mark__tag {
+  display: none;
+}
+
+[data-mui-color-scheme='dark'] .jagu-mark__title,
+[data-mui-color-scheme='dark'] .jagu-mark__sub {
+  color: #f4f0ea;
+}
