@@ -1,10 +1,21 @@
+overrides:
+  '@emoji-mart/react>react': 19.2.8
+  '@tiptap/core': 3.11.0
+  '@tiptap/extensions': 3.11.0
+  eslint: 8.57.1
+  eslint-config-next: 16.3.5
+  react: 19.2.8
+  react-dom: 19.2.8
+  rimraf: 5.0.7
+  unicorn-magic: 0.1.0
+
 allowBuilds:
-  '@firebase/util': set this to true or false
+  '@firebase/util': true
   '@prisma/client': true
   '@prisma/engines': true
   esbuild: true
   prisma: true
-  protobufjs: set this to true or false
+  protobufjs: true
 onlyBuiltDependencies:
   - '@prisma/client'
   - '@prisma/engines'
