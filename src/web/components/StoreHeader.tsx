@@ -118,18 +118,9 @@ const StoreHeader = () => {
       if (Date.now() < lockedUntil) return
 
       compact = next
-      lockedUntil = Date.now() + 520
+      lockedUntil = Date.now() + 280
       setScrolled(next)
       document.documentElement.classList.toggle('vn-is-scrolled', next)
-      const key = next ? '--vn-chrome-short' : '--vn-chrome-tall'
-      const fallback = next ? '110px' : '220px'
-      const value = getComputedStyle(document.documentElement).getPropertyValue(key).trim() || fallback
-      document.documentElement.style.setProperty('--vn-chrome-height', value)
-
-      // Expanding near top: pin to 0 so height growth cannot re-trigger compact
-      if (!next && (window.scrollY || document.documentElement.scrollTop || 0) < 90) {
-        window.scrollTo(0, 0)
-      }
     }
 
     const read = () => {

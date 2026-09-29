@@ -205,11 +205,6 @@ body:has(.vn-store) {
   flex-shrink: 0;
   height: var(--vn-chrome-height, 168px);
   pointer-events: none;
-  transition: height 0.5s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-html.vn-is-scrolled .vn-chrome-spacer {
-  height: var(--vn-chrome-short, var(--vn-chrome-height, 120px));
 }
 
 .vn-chrome {

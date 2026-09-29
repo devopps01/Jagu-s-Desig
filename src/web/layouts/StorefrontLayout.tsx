@@ -126,46 +126,21 @@ const StorefrontShell = ({ children }: { children: React.ReactNode }) => {
     }
 
     const measure = () => {
-      const keepScrolled =
-        header.classList.contains('is-scrolled') || document.documentElement.classList.contains('vn-is-scrolled')
-
-      header.style.setProperty('--vn-header-dur', '0s')
-      const spacer = document.querySelector('.vn-chrome-spacer')
-      if (spacer instanceof HTMLElement) spacer.style.transition = 'none'
-      chrome.style.visibility = 'hidden'
-
-      header.classList.remove('is-scrolled')
-      document.documentElement.classList.remove('vn-is-scrolled')
-      void chrome.offsetHeight
-      const tall = stackHeight()
-
-      header.classList.add('is-scrolled')
-      document.documentElement.classList.add('vn-is-scrolled')
-      void chrome.offsetHeight
-      const short = stackHeight()
-
-      document.documentElement.style.setProperty('--vn-chrome-tall', `${tall}px`)
-      document.documentElement.style.setProperty('--vn-chrome-short', `${short}px`)
-      document.documentElement.style.setProperty('--vn-chrome-height', `${keepScrolled ? short : tall}px`)
-
-      header.classList.toggle('is-scrolled', keepScrolled)
-      document.documentElement.classList.toggle('vn-is-scrolled', keepScrolled)
-
-      chrome.style.visibility = ''
-      header.style.removeProperty('--vn-header-dur')
-      if (spacer instanceof HTMLElement) spacer.style.transition = ''
+      const height = stackHeight()
+      document.documentElement.style.setProperty('--vn-chrome-height', `${height}px`)
+      document.documentElement.style.setProperty('--vn-chrome-tall', `${height}px`)
+      document.documentElement.style.setProperty('--vn-chrome-short', `${height}px`)
     }
 
     measure()
-    const onRemeasure = () => measure()
-    window.addEventListener('vn-chrome-remeasure', onRemeasure)
-    window.addEventListener('resize', onRemeasure)
-    const boot = window.setTimeout(measure, 400)
+    const observer = new ResizeObserver(() => measure())
+    observer.observe(chrome)
+    observer.observe(header)
+    window.addEventListener('vn-chrome-remeasure', measure)
 
     return () => {
-      window.removeEventListener('vn-chrome-remeasure', onRemeasure)
-      window.removeEventListener('resize', onRemeasure)
-      window.clearTimeout(boot)
+      observer.disconnect()
+      window.removeEventListener('vn-chrome-remeasure', measure)
     }
   }, [pathname])
 

@@ -31,13 +31,7 @@ const StorefrontMotion = () => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
     const seen = new WeakSet<Element>()
-    let lastY = window.scrollY
-
-    const onScroll = () => {
-      lastY = window.scrollY
-    }
-
-    window.addEventListener('scroll', onScroll, { passive: true })
+    const observers: IntersectionObserver[] = []
 
     const reveal = (el: Element) => {
       if (seen.has(el)) return
@@ -45,26 +39,26 @@ const StorefrontMotion = () => {
       seen.add(el)
       el.classList.add('vn-reveal', 'is-from-bottom')
 
+      const show = () => {
+        el.classList.add('is-in')
+      }
+
+      const rect = el.getBoundingClientRect()
+      if (rect.bottom > 0 && rect.top < window.innerHeight) {
+        show()
+        return
+      }
+
       const observer = new IntersectionObserver(
         ([entry]) => {
-          const y = window.scrollY
-          const goingDown = y >= lastY - 1
-
-          if (entry.isIntersecting) {
-            el.classList.toggle('is-from-top', !goingDown)
-            el.classList.toggle('is-from-bottom', goingDown)
-            el.classList.add('is-in')
-          } else {
-            el.classList.toggle('is-from-top', goingDown)
-            el.classList.toggle('is-from-bottom', !goingDown)
-            el.classList.remove('is-in')
-          }
-
-          lastY = y
+          if (!entry.isIntersecting) return
+          show()
+          observer.disconnect()
         },
-        { threshold: 0.1, rootMargin: '0px 0px -4% 0px' }
+        { threshold: 0.01, rootMargin: '0px 0px -4% 0px' }
       )
 
+      observers.push(observer)
       observer.observe(el)
     }
 
@@ -78,7 +72,7 @@ const StorefrontMotion = () => {
     mo.observe(document.querySelector('main') || document.body, { childList: true, subtree: true })
 
     return () => {
-      window.removeEventListener('scroll', onScroll)
+      observers.forEach(observer => observer.disconnect())
       mo.disconnect()
     }
   }, [])
