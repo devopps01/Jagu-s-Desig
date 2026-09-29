@@ -87,10 +87,14 @@ const normalizeSettings = (input: Partial<ContactSettings> = {}): ContactSetting
 })
 
 export const getContactSettings = async (): Promise<ContactSettings> => {
-  const db = await getDb()
-  const doc = await db.collection<{ key: string } & ContactSettings>('ContactSettings').findOne({ key: SETTINGS_KEY })
+  try {
+    const db = await getDb()
+    const doc = await db.collection<{ key: string } & ContactSettings>('ContactSettings').findOne({ key: SETTINGS_KEY })
 
-  return normalizeSettings(doc || {})
+    return normalizeSettings(doc || {})
+  } catch {
+    return defaultContactSettings
+  }
 }
 
 export const saveContactSettings = async (input: Partial<ContactSettings>) => {

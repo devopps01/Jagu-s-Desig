@@ -1,6 +1,8 @@
 import ContactPage from '@web/components/ContactPage'
 import { getContactSettings } from '@/libs/contact'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: "Contact Us | Jagu's Designing",
   description:

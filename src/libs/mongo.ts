@@ -13,13 +13,24 @@ const getClient = async () => {
   }
 
   if (!globalForMongo.mongoReady) {
-    const client = new MongoClient(uri)
-
-    globalForMongo.mongoReady = client.connect().then(connected => {
-      globalForMongo.mongoClient = connected
-
-      return connected
+    const client = new MongoClient(uri, {
+      serverSelectionTimeoutMS: 8000,
+      family: 4
     })
+
+    globalForMongo.mongoReady = client.connect().then(
+      connected => {
+        globalForMongo.mongoClient = connected
+
+        return connected
+      },
+      error => {
+        globalForMongo.mongoReady = undefined
+        globalForMongo.mongoClient = undefined
+
+        throw error
+      }
+    )
   }
 
   return globalForMongo.mongoReady
