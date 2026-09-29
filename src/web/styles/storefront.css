@@ -6422,8 +6422,42 @@ html.vn-show-scroll-top .vn-scroll-top i {
     grid-template-columns: 1fr;
   }
 
+  .vn-buy-assure {
+    grid-template-columns: 1fr;
+  }
+
   .vn-buy-assure li {
-    padding: 14px 8px;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: 'icon title' 'icon text';
+    column-gap: 12px;
+    row-gap: 2px;
+    justify-items: start;
+    text-align: left;
+    padding: 12px 14px;
+    border-right: 0;
+    border-bottom: 1px dashed rgba(122, 20, 88, 0.22);
+  }
+
+  .vn-buy-assure i {
+    grid-area: icon;
+    align-self: center;
+  }
+
+  .vn-buy-assure strong {
+    grid-area: title;
+  }
+
+  .vn-buy-assure span {
+    grid-area: text;
+  }
+
+  .vn-buy-assure li:last-child {
+    border-bottom: 0;
+  }
+
+  .vn-buy-assure strong,
+  .vn-buy-assure span {
+    min-height: 0;
   }
 
   .vn-buy-assure strong {
@@ -6698,8 +6732,8 @@ html.vn-show-scroll-top .vn-scroll-top i {
   }
 
   .vn-gallery-stage img {
-    height: min(62dvh, 520px);
-    max-height: min(62dvh, 520px);
+    height: min(48dvh, 400px);
+    max-height: min(48dvh, 400px);
   }
 
   .vn-gallery-zoom {
@@ -7144,7 +7178,16 @@ html.vn-show-scroll-top .vn-scroll-top i {
   .vn-grid,
   .vn-collection-grid {
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: 10px;
+  }
+
+  .vn-card-body {
+    padding: 10px 10px 12px;
+  }
+
+  .vn-card h3,
+  .vn-card h3 a {
+    font-size: 13px;
   }
 
   .vn-looks,
@@ -7282,7 +7325,7 @@ html.vn-show-scroll-top .vn-scroll-top i {
 
   .vn-wa-float {
     right: 14px;
-    bottom: max(16px, env(safe-area-inset-bottom));
+    bottom: calc(84px + env(safe-area-inset-bottom));
     width: 56px;
     min-height: 56px;
     padding: 0;
