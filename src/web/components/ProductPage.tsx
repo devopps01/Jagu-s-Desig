@@ -13,6 +13,7 @@ import WishlistButton from '@web/components/WishlistButton'
 import ProductReviews, { ProductRatingBadge } from '@web/components/ProductReviews'
 import GoogleReviewsBlock from '@web/components/GoogleReviewsBlock'
 import ProductAssure from '@web/components/ProductAssure'
+import ProductDealBanner from '@web/components/ProductDealBanner'
 import ProductInfoTabs from '@web/components/ProductInfoTabs'
 import HomeFeatures from '@web/components/HomeFeatures'
 import { RENT_SIZES } from '@/libs/rent-sizes'
@@ -123,6 +124,8 @@ const ProductPage = ({ slug, initialProduct }: { slug: string; initialProduct?: 
             compareAt={product.compareAt}
             fallback={product.price}
           />
+
+          <ProductDealBanner />
 
           <div className='vn-product-trust' aria-label='Store promises'>
             <span>

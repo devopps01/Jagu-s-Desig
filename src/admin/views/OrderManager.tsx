@@ -217,7 +217,7 @@ const OrderManager = () => {
                 </div>
               )
             },
-            { id: 'payment', label: 'Pay', render: row => row.paymentMethodTitle || row.payment?.toUpperCase() },
+            { id: 'payment', label: 'Pay', render: row => `${row.payment === 'paid' ? 'Paid' : row.payment === 'refunded' ? 'Refunded' : 'COD'}${row.paymentMethodTitle ? ` · ${row.paymentMethodTitle}` : ''}` },
             {
               id: 'createdAt',
               label: 'Date',
@@ -347,6 +347,12 @@ const OrderManager = () => {
             {open.returnRequestStatus ? <Typography color='text.secondary'>Return request: {open.returnRequestStatus}</Typography> : null}
             {open.paymentMethodTitle ? (
               <Typography color='text.secondary'>Method: {open.paymentMethodTitle}</Typography>
+            ) : null}
+            {open.razorpayPaymentId ? (
+              <Typography color='text.secondary'>Razorpay payment: {open.razorpayPaymentId}</Typography>
+            ) : null}
+            {open.razorpayOrderId ? (
+              <Typography color='text.secondary'>Razorpay order: {open.razorpayOrderId}</Typography>
             ) : null}
             <TextField
               select

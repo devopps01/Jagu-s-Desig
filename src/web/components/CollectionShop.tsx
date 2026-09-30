@@ -34,12 +34,25 @@ const CollectionShop = ({
   const [openKey, setOpenKey] = useState<string>('')
   const [sort, setSort] = useState('loved')
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let ignore = false
+
+    setLoading(true)
+    setProducts([])
+
     fetch(`/api/web/products?slug=${encodeURIComponent(slug)}`)
       .then(res => res.json())
-      .then(json => setProducts(Array.isArray(json) ? json : []))
-      .catch(() => setProducts([]))
+      .then(json => {
+        if (!ignore) setProducts(Array.isArray(json) ? json : [])
+      })
+      .catch(() => {
+        if (!ignore) setProducts([])
+      })
+      .finally(() => {
+        if (!ignore) setLoading(false)
+      })
 
     fetch(`/api/web/filters?slug=${encodeURIComponent(slug)}`)
       .then(res => res.json())
@@ -52,6 +65,10 @@ const CollectionShop = ({
         setSelected({})
       })
       .catch(() => setFilters([]))
+
+    return () => {
+      ignore = true
+    }
   }, [slug])
 
   const toggleValue = (key: string, value: string) => {
@@ -155,7 +172,7 @@ const CollectionShop = ({
         </aside>
         <div>
           <div className='vn-collection-toolbar'>
-            <span>{filtered.length} products</span>
+            <span>{loading ? 'Loading collection…' : `${filtered.length} products`}</span>
             <label>
               Sort by
               <select value={sort} onChange={event => setSort(event.target.value)}>
@@ -165,12 +182,20 @@ const CollectionShop = ({
               </select>
             </label>
           </div>
-          <div className='vn-collection-grid'>
-            {filtered.map(product => (
-              <ProductCard key={product.slug} product={product} />
-            ))}
+          <div className='vn-collection-grid' aria-busy={loading}>
+            {loading
+              ? Array.from({ length: 8 }, (_, index) => (
+                  <article className='vn-skel-card' key={index} aria-hidden='true'>
+                    <div className='vn-skel-media' />
+                    <div className='vn-skel-body'>
+                      <span className='vn-skel-line' />
+                      <span className='vn-skel-line is-short' />
+                    </div>
+                  </article>
+                ))
+              : filtered.map(product => <ProductCard key={product.slug} product={product} />)}
           </div>
-          {!filtered.length ? <p className='vn-empty'>No products match these filters.</p> : null}
+          {!loading && !filtered.length ? <p className='vn-empty'>No products match these filters.</p> : null}
         </div>
       </div>
       {filtersOpen ? (

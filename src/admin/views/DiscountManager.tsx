@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 
 import Button from '@mui/material/Button'
+import FormControlLabel from '@mui/material/FormControlLabel'
 import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
 import DialogContent from '@mui/material/DialogContent'
@@ -24,6 +25,9 @@ type DiscountRow = {
   value: number
   minSubtotal: number
   note: string
+  headline: string
+  showOnProduct: boolean
+  endsAt: string | null
   status: 'active' | 'inactive'
 }
 
@@ -34,7 +38,22 @@ const emptyForm = {
   value: '10',
   minSubtotal: '0',
   note: '',
+  headline: '',
+  showOnProduct: false,
+  endsAt: '',
   status: 'active' as 'active' | 'inactive'
+}
+
+const toLocalInput = (value?: string | null) => {
+  if (!value) return ''
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) return ''
+
+  const pad = (part: number) => String(part).padStart(2, '0')
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 const DiscountManager = () => {
@@ -53,6 +72,9 @@ const DiscountManager = () => {
       value: Number(form.value) || 0,
       minSubtotal: Number(form.minSubtotal) || 0,
       note: form.note,
+      headline: form.headline,
+      showOnProduct: form.showOnProduct,
+      endsAt: form.endsAt || null,
       status: form.status
     }
     const res = await fetch(form.id ? `/api/admin/discounts/${form.id}` : '/api/admin/discounts', {
@@ -126,6 +148,16 @@ const DiscountManager = () => {
           },
           { id: 'note', label: 'Note' },
           {
+            id: 'timer',
+            label: 'Product timer',
+            render: row =>
+              row.showOnProduct && row.endsAt
+                ? `Until ${new Date(row.endsAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}`
+                : row.endsAt
+                  ? `Expires ${new Date(row.endsAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}`
+                  : 'No end time'
+          },
+          {
             id: 'status',
             label: 'Active',
             render: row => (
@@ -158,6 +190,9 @@ const DiscountManager = () => {
                       value: String(row.value),
                       minSubtotal: String(row.minSubtotal || 0),
                       note: row.note || '',
+                      headline: row.headline || '',
+                      showOnProduct: row.showOnProduct,
+                      endsAt: toLocalInput(row.endsAt),
                       status: row.status
                     })
                     setOpen(true)
@@ -194,6 +229,29 @@ const DiscountManager = () => {
           <TextField label={form.type === 'percent' ? 'Percent' : 'Amount (₹)'} type='number' value={form.value} onChange={event => setForm(current => ({ ...current, value: event.target.value }))} />
           <TextField label='Minimum bag total (₹)' type='number' value={form.minSubtotal} onChange={event => setForm(current => ({ ...current, minSubtotal: event.target.value }))} />
           <TextField label='Note' value={form.note} onChange={event => setForm(current => ({ ...current, note: event.target.value }))} />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={form.showOnProduct}
+                onChange={event => setForm(current => ({ ...current, showOnProduct: event.target.checked }))}
+              />
+            }
+            label='Show on product page with a countdown'
+          />
+          <TextField
+            label='Banner headline'
+            value={form.headline}
+            onChange={event => setForm(current => ({ ...current, headline: event.target.value }))}
+            helperText='Example: Season finale sale'
+          />
+          <TextField
+            label='Offer ends'
+            type='datetime-local'
+            value={form.endsAt}
+            onChange={event => setForm(current => ({ ...current, endsAt: event.target.value }))}
+            slotProps={{ inputLabel: { shrink: true } }}
+            helperText='Required for the product-page timer. After this time the code stops working at checkout too.'
+          />
           <TextField select label='Status' value={form.status} onChange={event => setForm(current => ({ ...current, status: event.target.value as 'active' | 'inactive' }))}>
             <MenuItem value='active'>Active</MenuItem>
             <MenuItem value='inactive'>Inactive</MenuItem>

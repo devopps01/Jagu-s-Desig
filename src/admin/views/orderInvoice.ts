@@ -31,6 +31,8 @@ export type InvoiceOrder = {
   userEmail?: string
   paymentMethodTitle?: string
   paymentMethodType?: string
+  razorpayOrderId?: string
+  razorpayPaymentId?: string
   cancelRequestStatus?: string
   returnRequestStatus?: string
   createdAt: string | Date
@@ -86,7 +88,7 @@ export const invoiceHtml = (order: InvoiceOrder, kind: 'invoice' | 'slip' = 'inv
     </div>
     <div>
       <strong>${title}</strong>
-      <p class="muted">Order ${order.orderNo}<br/>Invoice ${order.invoiceNo || '-'}<br/>${date}<br/>Payment: ${order.paymentMethodTitle || order.payment.toUpperCase()} · ${order.payment.toUpperCase()} · ${order.status}</p>
+      <p class="muted">Order ${order.orderNo}<br/>Invoice ${order.invoiceNo || '-'}<br/>${date}<br/>Payment: ${order.paymentMethodTitle || order.payment.toUpperCase()} · ${order.payment.toUpperCase()}${order.razorpayPaymentId ? `<br/>Razorpay ${order.razorpayPaymentId}` : ''} · ${order.status}</p>
     </div>
   </div>
   <div class="row">

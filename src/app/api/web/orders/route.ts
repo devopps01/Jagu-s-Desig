@@ -50,6 +50,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: 'Choose a payment method' }, { status: 400 })
     }
 
+    if (method.type === 'razorpay') {
+      return NextResponse.json({ message: 'Complete this payment in the Razorpay window' }, { status: 400 })
+    }
+
     const created = await createWebOrder({
       customer: body.customer || {},
       items,

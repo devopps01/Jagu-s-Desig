@@ -8,10 +8,12 @@ import { lineUnitPrice, useCart } from '@web/context/CartContext'
 import { useLoginModal } from '@web/context/LoginModalContext'
 import { AddressBook } from '@web/components/AddressBook'
 import IndiaPlaceFields from '@web/components/IndiaPlaceFields'
+import OrderReceived, { type OrderReceipt } from '@web/components/OrderReceived'
 import type { SavedAddress } from '@/libs/addresses-types'
 import { paymentMethodIcon, type PaymentMethod } from '@/libs/payment-methods-types'
 import { offerAmount, type OfferType } from '@/libs/offers'
 import { calcGstAmount, defaultGstSettings, type GstSettings } from '@/libs/gst-types'
+import { loadRazorpay, openRazorpayCheckout, nationalMobile, razorpayContact } from '@web/lib/razorpay-checkout'
 
 type AppliedDiscount = {
   code: string
@@ -27,9 +29,12 @@ const CheckoutPage = () => {
   const { lines, count, clearCart, setQty, removeItem } = useCart()
   const { user, ready, openLogin } = useLoginModal()
   const [placed, setPlaced] = useState(false)
+  const [placedPaid, setPlacedPaid] = useState(false)
   const [placedNo, setPlacedNo] = useState('')
+  const [receipt, setReceipt] = useState<OrderReceipt | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [askPhone, setAskPhone] = useState(false)
   const [couponInput, setCouponInput] = useState('')
   const [coupon, setCoupon] = useState<AppliedDiscount | null>(null)
   const [couponError, setCouponError] = useState('')
@@ -42,6 +47,7 @@ const CheckoutPage = () => {
   const [form, setForm] = useState({
     name: '',
     phone: '',
+    email: '',
     address: '',
     locality: '',
     city: '',
@@ -89,16 +95,79 @@ const CheckoutPage = () => {
 
   const selectedMethod = methods.find(item => item.id === paymentMethodId)
 
-  useEffect(() => {
-    fetch('/api/web/payment-methods')
-      .then(res => res.json())
-      .then(json => {
-        const rows = Array.isArray(json) ? (json as PaymentMethod[]) : []
+  const snapshotReceipt = (orderNo: string, paid: boolean): OrderReceipt => ({
+    orderNo,
+    paid,
+    method: selectedMethod?.title || (paid ? 'Razorpay' : 'Cash on delivery'),
+    items: lines.map(line => {
+      const unit = lineUnitPrice(line)
 
-        setMethods(rows)
-        setPaymentMethodId(current => current || rows[0]?.id || '')
+      return {
+        title: line.product.title,
+        image: line.product.image,
+        qty: line.qty,
+        size: line.size || '',
+        unit,
+        lineTotal: money(unit * line.qty)
+      }
+    }),
+    subtotal: breakdown.sellingTotal,
+    discount: breakdown.couponDiscount,
+    discountCode: coupon?.code || '',
+    productSavings: breakdown.productDiscount,
+    gst: breakdown.gstAmount,
+    gstRate: breakdown.gstRate,
+    gstLabel: breakdown.gstLabel,
+    shipping: breakdown.shipping,
+    total: breakdown.payable,
+    name: form.name.trim(),
+    phone: razorpayContact(form.phone) || form.phone,
+    address: [form.address, form.locality, form.city, form.state, form.pincode].filter(Boolean).join(', ')
+  })
+
+  useEffect(() => {
+    void loadRazorpay().catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    const upiMethod: PaymentMethod = {
+      id: 'razorpay-upi',
+      title: 'UPI',
+      type: 'razorpay',
+      details: 'GPay, PhonePe, Paytm or any UPI ID',
+      instructions: 'Razorpay opens on UPI. Scan the QR or pay from your UPI app.',
+      sortOrder: 0,
+      status: 'active'
+    }
+    const razorpayMethod: PaymentMethod = {
+      id: 'razorpay',
+      title: 'Card or netbanking',
+      type: 'razorpay',
+      details: 'Debit card, credit card, EMI and netbanking',
+      instructions: 'A secure Razorpay window opens. Login is not required.',
+      sortOrder: 1,
+      status: 'active'
+    }
+
+    Promise.all([
+      fetch('/api/web/payment-methods').then(res => res.json()).catch(() => []),
+      fetch('/api/web/payments/razorpay/config').then(res => res.json()).catch(() => ({ enabled: false }))
+    ]).then(([json, config]) => {
+      const rows = Array.isArray(json) ? (json as PaymentMethod[]) : []
+      const enabled = Boolean(config?.enabled)
+      const listed = rows.filter(item => {
+        if (item.type === 'razorpay') return enabled
+        if (enabled && (item.type === 'upi' || item.type === 'bank' || item.type === 'online')) return false
+
+        return item.type === 'cod' || item.type === 'other'
       })
-      .catch(() => setMethods([]))
+
+      if (enabled && !listed.some(item => item.id === 'razorpay')) listed.unshift(razorpayMethod)
+      if (enabled && !listed.some(item => item.id === 'razorpay-upi')) listed.unshift(upiMethod)
+
+      setMethods(listed)
+      setPaymentMethodId(listed.find(item => item.id === 'razorpay-upi')?.id || listed.find(item => item.type === 'razorpay')?.id || listed[0]?.id || '')
+    })
 
     fetch('/api/web/gst')
       .then(res => res.json())
@@ -152,16 +221,23 @@ const CheckoutPage = () => {
 
   const applySavedAddress = useCallback((item: SavedAddress) => {
     setSelectedAddressId(item.id)
-    setForm({
+    setForm(current => ({
       name: item.name,
       phone: item.phone,
+      email: current.email,
       address: item.address,
       locality: item.locality,
       city: item.city,
       state: item.state,
       pincode: item.pincode
-    })
+    }))
   }, [])
+
+  useEffect(() => {
+    if (!user?.email) return
+
+    setForm(current => (current.email ? current : { ...current, email: user.email }))
+  }, [user?.email])
 
   useEffect(() => {
     if (!count || placed || !ready || user) return
@@ -198,11 +274,174 @@ const CheckoutPage = () => {
     setCouponInput('')
   }
 
+  const payWithRazorpay = async () => {
+    setSaving(true)
+
+    const address = form.address.trim() || [form.locality, form.city, form.state, form.pincode].filter(Boolean).join(', ')
+
+    const start = await fetch('/api/web/payments/razorpay/order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer: { ...form, address, phone: razorpayContact(form.phone) },
+        items: lines.map(line => ({ slug: line.product.slug, qty: line.qty, size: line.size || '' })),
+        discountCode: coupon?.code || ''
+      })
+    })
+    const payload = await start.json()
+
+    if (!start.ok) {
+      setSaving(false)
+      setError(payload.message || 'Could not start payment')
+
+      return
+    }
+
+    try {
+      await loadRazorpay()
+    } catch (loadError) {
+      setSaving(false)
+      setError(loadError instanceof Error ? loadError.message : 'Could not load the secure payment window')
+
+      return
+    }
+
+    const contact = razorpayContact(form.phone)
+    const email = (form.email || user?.email || '').trim()
+
+    if (!contact || !email.includes('@')) {
+      setSaving(false)
+      if (!contact) setAskPhone(true)
+      setError(!contact ? '' : 'Enter an email in Delivery details so payment can open.')
+
+      return
+    }
+
+    let settled = false
+    const upi = selectedMethod?.id === 'razorpay-upi'
+    const checkout = openRazorpayCheckout({
+      key: payload.keyId,
+      amount: payload.amount,
+      currency: 'INR',
+      name: "Jagu's Designing",
+      description: upi ? 'UPI payment' : 'Chaniya choli order',
+      order_id: payload.orderId,
+      remember_customer: false,
+      prefill: {
+        name: form.name.trim(),
+        contact: `+91${contact}`,
+        email,
+        ...(upi ? { method: 'upi' as const } : {})
+      },
+      readonly: { name: true, contact: true, email: true },
+      ...(upi
+        ? {
+            config: {
+              display: {
+                blocks: {
+                  upi: {
+                    name: 'Pay by UPI',
+                    instruments: [
+                      {
+                        method: 'upi',
+                        flows: ['intent', 'qr'],
+                        apps: ['google_pay', 'phonepe', 'paytm', 'bhim']
+                      }
+                    ]
+                  }
+                },
+                sequence: ['block.upi'],
+                preferences: { show_default_blocks: false }
+              }
+            }
+          }
+        : {}),
+      theme: { color: '#d82460' },
+      method: { upi: true, card: !upi, netbanking: !upi, wallet: !upi, emi: !upi, paylater: false },
+      modal: {
+        ondismiss: () => {
+          if (settled) return
+          setSaving(false)
+          setError('Payment window was closed. Your order was not placed.')
+        }
+      },
+      handler: response => {
+        settled = true
+        void fetch('/api/web/payments/razorpay/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(response)
+        })
+          .then(async res => {
+            const json = await res.json()
+
+            if (!res.ok) {
+              setSaving(false)
+              setError(json.message || 'Payment could not be confirmed')
+
+              return
+            }
+
+            setPlacedPaid(true)
+            setPlaced(true)
+            setPlacedNo(json.orderNo || '')
+            setReceipt(snapshotReceipt(json.orderNo || '', true))
+            clearCart()
+            setSaving(false)
+          })
+          .catch(() => {
+            setSaving(false)
+            setError('Payment was received but the order could not be confirmed. Please contact the atelier with your payment reference.')
+          })
+      }
+    })
+
+    checkout.on('payment.failed', failed => {
+      settled = true
+      setSaving(false)
+      setError(failed.error?.description || 'Payment failed. No order was placed.')
+    })
+    checkout.open()
+  }
+
   const placeOrder = async () => {
     setError('')
+    setSaving(true)
 
-    if (!paymentMethodId) {
+    const payOnline = selectedMethod?.type !== 'cod'
+
+    if (!payOnline && !paymentMethodId) {
       setError('Choose a payment method')
+
+      return
+    }
+
+    if (payOnline) {
+      const phone = razorpayContact(form.phone)
+      const missing = !form.name.trim() ? 'name' : !phone ? 'phone' : null
+
+      if (missing === 'phone' || !phone) {
+        setSaving(false)
+        setAskPhone(true)
+
+        return
+      }
+
+      if (missing) {
+        setSaving(false)
+        setError(missing === 'name' ? 'Enter your full name in Delivery details.' : '')
+
+        return
+      }
+
+      if (!form.city.trim() || !form.state.trim() || form.pincode.replace(/\D/g, '').length !== 6) {
+        setSaving(false)
+        setError('Enter pincode, city and state, then Place order opens Razorpay.')
+
+        return
+      }
+
+      await payWithRazorpay()
 
       return
     }
@@ -246,6 +485,7 @@ const CheckoutPage = () => {
 
     setPlaced(true)
     setPlacedNo(json.orderNo || '')
+    setReceipt(snapshotReceipt(json.orderNo || '', false))
     clearCart()
   }
 
@@ -266,6 +506,10 @@ const CheckoutPage = () => {
     )
   }
 
+  if (placed && receipt) {
+    return <OrderReceived receipt={receipt} />
+  }
+
   if (placed) {
     return (
       <section className='vn-section vn-checkout-page'>
@@ -274,7 +518,7 @@ const CheckoutPage = () => {
           <div className='vn-rule' />
         </div>
         <div className='vn-drawer-empty vn-cart-page-empty'>
-          <p>Thank you{placedNo ? `. Order ${placedNo}` : ''}. We will confirm on WhatsApp or phone shortly.</p>
+          <p>Thank you{placedNo ? `. Order ${placedNo}` : ''}. {placedPaid ? 'Your Razorpay payment is confirmed.' : 'We will confirm on WhatsApp or phone shortly.'}</p>
           <div className='vn-account-actions' style={{ justifyContent: 'center' }}>
             {placedNo ? (
               <Link className='vn-btn vn-btn-solid' href={`/track-order?order=${placedNo}`}>
@@ -366,6 +610,7 @@ const CheckoutPage = () => {
 
           <form
             className='vn-checkout-form'
+            noValidate
             onSubmit={event => {
               event.preventDefault()
               void placeOrder()
@@ -380,13 +625,13 @@ const CheckoutPage = () => {
               </p>
 
               <div className='vn-field-row'>
-                <label className='vn-field'>
+                <label className='vn-field' data-pay='name'>
                   <span>Full name</span>
-                  <input required autoComplete='name' value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} />
+                  <input autoComplete='name' value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} />
                 </label>
                 <label className='vn-field'>
-                  <span>Phone</span>
-                  <input required autoComplete='tel' inputMode='tel' value={form.phone} onChange={event => setForm(current => ({ ...current, phone: event.target.value }))} />
+                  <span>Email</span>
+                  <input type='email' autoComplete='email' value={form.email} onChange={event => setForm(current => ({ ...current, email: event.target.value }))} />
                 </label>
               </div>
 
@@ -400,7 +645,7 @@ const CheckoutPage = () => {
 
               <label className='vn-field'>
                 <span>House / street</span>
-                <textarea required rows={3} autoComplete='street-address' value={form.address} onChange={event => setForm(current => ({ ...current, address: event.target.value }))} />
+                <textarea rows={3} autoComplete='street-address' value={form.address} onChange={event => setForm(current => ({ ...current, address: event.target.value }))} />
               </label>
 
               <label className='vn-field'>
@@ -408,10 +653,12 @@ const CheckoutPage = () => {
                 <input autoComplete='address-level3' value={form.locality} onChange={event => setForm(current => ({ ...current, locality: event.target.value }))} />
               </label>
 
+              <div data-pay='place'>
               <IndiaPlaceFields
                 city={form.city}
                 state={form.state}
                 pincode={form.pincode}
+                required={false}
                 onChange={patch =>
                   setForm(current => ({
                     ...current,
@@ -422,11 +669,16 @@ const CheckoutPage = () => {
                   }))
                 }
               />
+              </div>
             </div>
 
             <div className='vn-checkout-block'>
               <h2>Payment method</h2>
-              <p className='vn-drawer-note'>Choose how you will pay. The atelier can change these options from the admin panel.</p>
+              <p className='vn-drawer-note'>
+                {selectedMethod?.type === 'razorpay'
+                  ? 'Pay now with UPI, card, netbanking or EMI. Razorpay opens in its own window. You do not need to log in.'
+                  : 'Choose how you will pay. The atelier can change these options from the admin panel.'}
+              </p>
               {methods.length ? (
                 <div className='vn-pay-list'>
                   {methods.map(method => (
@@ -440,7 +692,7 @@ const CheckoutPage = () => {
                       />
                       <span>
                         <strong>
-                          <i className={paymentMethodIcon(method.type)} />
+                          <i className={method.id === 'razorpay-upi' ? 'tabler-qrcode' : paymentMethodIcon(method.type)} />
                           {method.title}
                         </strong>
                         {method.details ? <em>{method.details}</em> : null}
@@ -454,10 +706,35 @@ const CheckoutPage = () => {
               )}
             </div>
 
+            {selectedMethod?.type !== 'cod' ? (
+              <label className={`vn-field${askPhone && !razorpayContact(form.phone) ? ' is-missing' : ''}`}>
+                <span>Mobile number</span>
+                <input
+                  inputMode='tel'
+                  autoComplete='tel'
+                  placeholder='8488973133 or +91 8488973133'
+                  value={nationalMobile(form.phone)}
+                  onChange={event => {
+                    setAskPhone(false)
+                    setError('')
+                    setForm(current => ({ ...current, phone: nationalMobile(event.target.value) }))
+                  }}
+                />
+                {askPhone && !razorpayContact(form.phone) ? (
+                  <small className='vn-checkout-error'>Use a 10-digit mobile. +91 is added automatically.</small>
+                ) : (
+                  <small className='vn-drawer-note'>{razorpayContact(form.phone) ? `Paying with +91 ${razorpayContact(form.phone)}` : 'You can type +91. Only the 10-digit number is kept.'}</small>
+                )}
+              </label>
+            ) : null}
+
             {error ? <p className='vn-checkout-error'>{error}</p> : null}
-            <button className='vn-btn vn-btn-solid vn-drawer-cta' type='submit' disabled={saving || !methods.length}>
-              {saving ? 'Placing order…' : `Place order · ${formatPrice(breakdown.payable)}`}
+            <button className='vn-btn vn-btn-solid vn-drawer-cta' type='button' disabled={saving || !methods.length} onClick={() => void placeOrder()}>
+              {saving ? (selectedMethod?.type === 'cod' ? 'Placing order…' : 'Opening payment…') : `Place order · ${formatPrice(breakdown.payable)}`}
             </button>
+            {selectedMethod?.type !== 'cod' ? (
+              <p className='vn-drawer-note'>Place order opens Razorpay so you can pay by UPI, card, netbanking or EMI.</p>
+            ) : null}
             <Link className='vn-btn vn-btn-outline vn-drawer-cta' href='/cart'>
               Back to cart
             </Link>

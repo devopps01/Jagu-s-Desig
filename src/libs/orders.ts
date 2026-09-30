@@ -61,6 +61,10 @@ export type WebOrderInput = {
   paymentMethodId?: string
   paymentMethodTitle?: string
   paymentMethodType?: string
+  payment?: PaymentStatus
+  orderStatus?: OrderStatus
+  razorpayOrderId?: string
+  razorpayPaymentId?: string
 }
 
 const nextNumbers = async () => {
@@ -110,6 +114,8 @@ const mapOrder = (row: Record<string, unknown> & { _id: ObjectId }) => ({
   paymentMethodId: String(row.paymentMethodId || ''),
   paymentMethodTitle: String(row.paymentMethodTitle || ''),
   paymentMethodType: String(row.paymentMethodType || ''),
+  razorpayOrderId: String(row.razorpayOrderId || ''),
+  razorpayPaymentId: String(row.razorpayPaymentId || ''),
   cancelRequestStatus: String(row.cancelRequestStatus || ''),
   returnRequestStatus: String(row.returnRequestStatus || ''),
   deliveredAt: row.deliveredAt || null,
@@ -163,11 +169,13 @@ export const createWebOrder = async (input: WebOrderInput) => {
       state: (input.customer.state || '').trim(),
       pincode: input.customer.pincode.trim()
     },
-    status: 'pending' satisfies OrderStatus,
-    payment: (input.paymentMethodType === 'cod' || !input.paymentMethodType ? 'cod' : 'cod') satisfies PaymentStatus,
+    status: (input.orderStatus || 'pending') satisfies OrderStatus,
+    payment: (input.payment || 'cod') satisfies PaymentStatus,
     paymentMethodId: input.paymentMethodId || '',
     paymentMethodTitle: input.paymentMethodTitle || (input.paymentMethodType === 'cod' ? 'Cash on delivery' : ''),
     paymentMethodType: input.paymentMethodType || 'cod',
+    razorpayOrderId: input.razorpayOrderId || '',
+    razorpayPaymentId: input.razorpayPaymentId || '',
     userEmail: (input.userEmail || '').trim().toLowerCase(),
     userId: input.userId || '',
     createdAt: now,

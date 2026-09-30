@@ -1,4 +1,4 @@
-export type PaymentMethodType = 'cod' | 'upi' | 'bank' | 'online' | 'other'
+export type PaymentMethodType = 'cod' | 'upi' | 'bank' | 'online' | 'razorpay' | 'other'
 export type PaymentMethodStatus = 'active' | 'inactive'
 
 export type PaymentMethod = {
@@ -16,6 +16,7 @@ export const PAYMENT_METHOD_TYPES: { id: PaymentMethodType; label: string }[] = 
   { id: 'upi', label: 'UPI' },
   { id: 'bank', label: 'Bank transfer' },
   { id: 'online', label: 'Online / card' },
+  { id: 'razorpay', label: 'Razorpay (UPI, card, EMI)' },
   { id: 'other', label: 'Other' }
 ]
 
@@ -26,7 +27,7 @@ export const paymentMethodIcon = (type: string) => {
   if (type === 'cod') return 'tabler-cash'
   if (type === 'upi') return 'tabler-qrcode'
   if (type === 'bank') return 'tabler-building-bank'
-  if (type === 'online') return 'tabler-credit-card'
+  if (type === 'online' || type === 'razorpay') return 'tabler-credit-card'
 
   return 'tabler-wallet'
 }

@@ -24,11 +24,12 @@ const ProductCard = ({ product }: { product: StoreProduct }) => {
 
   return (
     <article className='vn-card'>
+      <Link href={`/products/${product.slug}`} className='vn-card-open' aria-label={product.title} />
       <div className={`vn-card-media${hasSwap ? ' has-swap' : ' has-zoom'}`}>
-        <Link href={`/products/${product.slug}`} className='vn-card-media-link'>
+        <div className='vn-card-media-link'>
           <ProductMedia src={primary} alt={alt} className='is-primary' />
           {hasSwap ? <ProductMedia src={secondary} alt={`${alt} — alternate view`} className='is-hover' /> : null}
-        </Link>
+        </div>
         <ListingBadges />
         <WishlistButton product={product} />
         <button
@@ -36,6 +37,7 @@ const ProductCard = ({ product }: { product: StoreProduct }) => {
           type='button'
           onClick={event => {
             event.preventDefault()
+            event.stopPropagation()
             addItem(product, { size: 'M' })
           }}
         >
@@ -43,13 +45,9 @@ const ProductCard = ({ product }: { product: StoreProduct }) => {
         </button>
       </div>
       <div className='vn-card-body'>
-        <h3>
-          <Link href={`/products/${product.slug}`} title={product.title}>
-            {product.title}
-          </Link>
-        </h3>
+        <h3 title={product.title}>{product.title}</h3>
         {product.reviews ? (
-          <Link className='vn-rating-badge' href={product.googleReviews ? `/products/${product.slug}#google-reviews` : `/products/${product.slug}#reviews`}>
+          <p className='vn-rating-badge'>
             <span className='vn-stars is-sm'>
               {[1, 2, 3, 4, 5].map(star => (
                 <span key={star} className={star <= Math.round(product.rating) ? 'is-on' : ''}>
@@ -61,7 +59,7 @@ const ProductCard = ({ product }: { product: StoreProduct }) => {
               {product.googleReviews ? 'Google ' : ''}
               {product.rating.toFixed(1)} · {product.reviews}
             </span>
-          </Link>
+          </p>
         ) : null}
         <ProductPrices
           sellingPrice={product.sellingPrice}

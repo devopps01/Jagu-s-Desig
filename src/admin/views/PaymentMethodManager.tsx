@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import Button from '@mui/material/Button'
 import Dialog from '@mui/material/Dialog'
@@ -40,6 +40,14 @@ const PaymentMethodManager = () => {
   const [form, setForm] = useState(emptyForm)
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
+  const [razorpayReady, setRazorpayReady] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    fetch('/api/admin/payments/razorpay')
+      .then(res => (res.ok ? res.json() : null))
+      .then(json => setRazorpayReady(Boolean(json?.enabled)))
+      .catch(() => setRazorpayReady(false))
+  }, [])
 
   const save = async () => {
     setError('')
@@ -72,9 +80,14 @@ const PaymentMethodManager = () => {
 
   return (
     <>
+      {razorpayReady === false ? (
+        <Typography color='error' sx={{ mb: 2 }}>
+          Razorpay keys are missing. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET on the server, then restart the app. The secret is never sent to the shop.
+        </Typography>
+      ) : null}
       <AdminDataTable
         title='Payment methods'
-        subtitle='Methods shown on checkout. Turn a method off to hide it from customers.'
+        subtitle='Methods shown on checkout. Razorpay opens its own payment window for UPI, cards, netbanking and EMI. The secret key stays on the server.'
         search={table.search}
         searchPlaceholder='Search payment methods...'
         onSearchChange={table.setSearch}
@@ -204,7 +217,11 @@ const PaymentMethodManager = () => {
             label={form.type === 'upi' ? 'UPI ID' : form.type === 'bank' ? 'Account details' : 'Pay-to details (optional)'}
             value={form.details}
             onChange={event => setForm(current => ({ ...current, details: event.target.value }))}
-            helperText='Shown on checkout. Example: jagus@upi or account number.'
+            helperText={
+              form.type === 'razorpay'
+                ? 'Checkout opens Razorpay. Enable EMI in your Razorpay dashboard if you want EMI plans.'
+                : 'Shown on checkout. Example: jagus@upi or account number.'
+            }
           />
           <TextField
             label='Instructions'

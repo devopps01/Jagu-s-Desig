@@ -38,7 +38,15 @@ const StorefrontEngage = () => {
   }, [])
 
   useEffect(() => {
-    if (!ready || user || pathname === '/login') return
+    if (pathname === '/checkout') {
+      closeLogin()
+      setOfferOpen(false)
+      setPushOpen(false)
+    }
+  }, [closeLogin, pathname])
+
+  useEffect(() => {
+    if (!ready || user || pathname === '/login' || pathname === '/checkout') return
     if (window.sessionStorage.getItem(LOGIN_SHOWN) === '1') return
 
     window.sessionStorage.setItem(LOGIN_SHOWN, '1')
@@ -46,7 +54,7 @@ const StorefrontEngage = () => {
   }, [openLogin, pathname, ready, user])
 
   useEffect(() => {
-    if (!ready || user || pathname === '/login') return
+    if (!ready || user || pathname === '/login' || pathname === '/checkout') return
 
     const last = window.sessionStorage.getItem(LAST_PATH)
 
@@ -63,16 +71,16 @@ const StorefrontEngage = () => {
   }, [isOpen, pathname, ready, user])
 
   useEffect(() => {
-    if (!ready || user || isOpen) return
+    if (!ready || user || isOpen || pathname === '/checkout') return
     if (window.localStorage.getItem(OFFER_DONE) === '1') return
 
     const count = Number(window.sessionStorage.getItem(PAGE_VIEWS) || '0')
 
     if (count >= 3) setOfferOpen(true)
-  }, [isOpen, ready, user])
+  }, [isOpen, pathname, ready, user])
 
   useEffect(() => {
-    if (!ready || isOpen || offerOpen) return
+    if (!ready || isOpen || offerOpen || pathname === '/checkout') return
     if (typeof window === 'undefined' || !('Notification' in window)) return
 
     if (Notification.permission === 'granted') {

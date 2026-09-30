@@ -66,7 +66,7 @@ const defaults: Omit<PaymentMethodDoc, '_id' | 'createdAt' | 'updatedAt'>[] = [
     details: '',
     instructions: 'We will share the UPI ID on WhatsApp after the order is confirmed. Send the payment screenshot to the atelier.',
     sortOrder: 2,
-    status: 'active'
+    status: 'inactive'
   },
   {
     title: 'Bank transfer',
