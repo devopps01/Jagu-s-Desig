@@ -1,3 +1,4 @@
+import { STORE_PHONE_DISPLAY } from '@/libs/contact-types'
 import { formatPrice } from '@web/data/catalog'
 
 export type InvoiceOrder = {
@@ -18,7 +19,7 @@ export type InvoiceOrder = {
   gstRate?: number
   gstAmount?: number
   gstLabel?: string
-  items: { title: string; qty: number; unit: number; mrp: number; lineTotal: number }[]
+  items: { title: string; qty: number; unit: number; mrp: number; lineTotal: number; size?: string }[]
   customer: {
     name: string
     phone: string
@@ -51,7 +52,7 @@ export const invoiceHtml = (order: InvoiceOrder, kind: 'invoice' | 'slip' = 'inv
       (item, index) => `
       <tr>
         <td>${index + 1}</td>
-        <td>${item.title}</td>
+        <td>${item.title}${item.size ? ` · Size ${item.size}` : ''}</td>
         <td>${item.qty}</td>
         <td>${money(item.mrp || item.unit)}</td>
         <td>${money(item.unit)}</td>
@@ -84,7 +85,7 @@ export const invoiceHtml = (order: InvoiceOrder, kind: 'invoice' | 'slip' = 'inv
   <div class="row">
     <div>
       <h1>Jagu's Designing</h1>
-      <p class="muted">Jagu's Designing Collections<br/>93, Ambika Nagar Society, Mahadev Chowk, Mota Varachha<br/>Surat, Gujarat 394101, India<br/>Phone: (+91) 8154 0000 63</p>
+      <p class="muted">Jagu's Designing Collections<br/>93, Ambika Nagar Society, Mahadev Chowk, Mota Varachha<br/>Surat, Gujarat 394101, India<br/>Phone: ${STORE_PHONE_DISPLAY}</p>
     </div>
     <div>
       <strong>${title}</strong>

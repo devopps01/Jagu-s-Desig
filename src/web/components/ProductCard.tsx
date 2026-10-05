@@ -26,10 +26,10 @@ const ProductCard = ({ product }: { product: StoreProduct }) => {
     <article className='vn-card'>
       <Link href={`/products/${product.slug}`} className='vn-card-open' aria-label={product.title} />
       <div className={`vn-card-media${hasSwap ? ' has-swap' : ' has-zoom'}`}>
-        <div className='vn-card-media-link'>
-          <ProductMedia src={primary} alt={alt} className='is-primary' />
-          {hasSwap ? <ProductMedia src={secondary} alt={`${alt} — alternate view`} className='is-hover' /> : null}
-        </div>
+        <Link href={`/products/${product.slug}`} className='vn-card-media-link' aria-label={product.title}>
+          <ProductMedia src={primary} alt={alt} className='is-primary' size='card' />
+          {hasSwap ? <ProductMedia src={secondary} alt={`${alt} — alternate view`} className='is-hover' size='card' /> : null}
+        </Link>
         <ListingBadges />
         <WishlistButton product={product} />
         <button

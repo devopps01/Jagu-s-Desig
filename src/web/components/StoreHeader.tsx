@@ -109,25 +109,28 @@ const StoreHeader = () => {
   }, [])
 
   useEffect(() => {
-    let compact = false
+    const SHRINK_AT = 140
+    const EXPAND_AT = 24
+    let compact = window.scrollY > SHRINK_AT
     let frame = 0
-    let lockedUntil = 0
 
-    const apply = (next: boolean) => {
-      if (next === compact) return
-      if (Date.now() < lockedUntil) return
-
-      compact = next
-      lockedUntil = Date.now() + 280
-      setScrolled(next)
-      document.documentElement.classList.toggle('vn-is-scrolled', next)
-    }
+    setScrolled(compact)
+    document.documentElement.classList.toggle('vn-is-scrolled', compact)
 
     const read = () => {
-      if (Date.now() < lockedUntil) return
+      if (document.documentElement.dataset.vnAdjust === '1') return
+
       const y = window.scrollY || document.documentElement.scrollTop || 0
-      if (!compact && y > 80) apply(true)
-      else if (compact && y < 20) apply(false)
+
+      if (!compact && y > SHRINK_AT) {
+        compact = true
+        setScrolled(true)
+        document.documentElement.classList.add('vn-is-scrolled')
+      } else if (compact && y < EXPAND_AT) {
+        compact = false
+        setScrolled(false)
+        document.documentElement.classList.remove('vn-is-scrolled')
+      }
     }
 
     const onScroll = () => {
@@ -135,7 +138,6 @@ const StoreHeader = () => {
       frame = requestAnimationFrame(read)
     }
 
-    read()
     window.addEventListener('scroll', onScroll, { passive: true })
 
     return () => {

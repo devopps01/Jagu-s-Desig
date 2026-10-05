@@ -4,6 +4,7 @@ import Link from 'next/link'
 
 import { formatPrice } from '@web/data/catalog'
 import { lineUnitPrice, type CartLine } from '@web/context/CartContext'
+import { imageAttrs } from '@web/lib/image-src'
 
 const CartLineItem = ({
   line,
@@ -23,7 +24,7 @@ const CartLineItem = ({
   return (
     <article className='vn-cart-item'>
       <Link href={`/products/${line.product.slug}`} className='vn-cart-thumb' onClick={onNavigate}>
-        <img src={line.product.image} alt={line.product.title} />
+        <img {...imageAttrs(line.product.image, 'thumb')} alt={line.product.title} loading='lazy' decoding='async' />
       </Link>
       <div className='vn-cart-info'>
         <div className='vn-cart-top'>

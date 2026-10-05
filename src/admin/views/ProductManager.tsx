@@ -38,6 +38,7 @@ const emptyForm: ProductFormValue = {
   design: '',
   style: 'Chaniya Choli',
   styles: ['Chaniya Choli'],
+  sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size'],
   details: [
     { label: 'Country of manufacture', value: 'India' },
     { label: 'Wash care', value: 'Dry wash only' },
@@ -47,7 +48,9 @@ const emptyForm: ProductFormValue = {
   ],
   seoTitle: '',
   seoDescription: '',
-  status: 'active'
+  status: 'active',
+  isBestSeller: false,
+  isTrending: false
 }
 
 const ProductManager = () => {
@@ -180,6 +183,40 @@ const ProductManager = () => {
             }
           },
           {
+            id: 'isTrending',
+            label: 'Trending',
+            render: row => (
+              <Switch
+                size='small'
+                checked={Boolean(row.isTrending)}
+                onChange={() =>
+                  void fetch(`/api/admin/products/${row.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ isTrending: !row.isTrending })
+                  }).then(() => table.reload())
+                }
+              />
+            )
+          },
+          {
+            id: 'isBestSeller',
+            label: 'Most selling',
+            render: row => (
+              <Switch
+                size='small'
+                checked={Boolean(row.isBestSeller)}
+                onChange={() =>
+                  void fetch(`/api/admin/products/${row.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ isBestSeller: !row.isBestSeller })
+                  }).then(() => table.reload())
+                }
+              />
+            )
+          },
+          {
             id: 'status',
             label: 'Status',
             render: row => (
@@ -210,6 +247,7 @@ const ProductManager = () => {
                       ...row,
                       collections: row.collections || [],
                       styles: Array.isArray(row.styles) && row.styles.length ? row.styles : row.style ? [row.style] : [],
+                      sizes: Array.isArray(row.sizes) && row.sizes.length ? row.sizes.filter(item => item !== 'Custom' && !/^\d+$/.test(item)) : ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size'],
                       details:
                         Array.isArray(row.details) && row.details.length
                           ? row.details

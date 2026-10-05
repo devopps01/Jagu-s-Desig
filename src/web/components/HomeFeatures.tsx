@@ -24,16 +24,16 @@ const features = [
     title: 'Stitching Service',
     text: 'From size customization to perfect tailoring, expert stitching so your outfit fits like a dream.'
   }
-] as const
+]
 
-const HomeFeatures = () => (
+const HomeFeatures = ({ items = features }: { items?: { icon: string; title: string; text: string; showTitle?: boolean; showText?: boolean }[] }) => (
   <section className='vn-features' aria-label='Store services'>
     <div className='vn-features-frame'>
-      {features.map(item => (
+      {items.map(item => (
         <article key={item.title} className='vn-features-item'>
           <i className={item.icon} aria-hidden='true' />
-          <h3>{item.title}</h3>
-          <p>{item.text}</p>
+          {item.showTitle !== false ? <h3>{item.title}</h3> : null}
+          {item.showText !== false ? <p>{item.text}</p> : null}
         </article>
       ))}
     </div>

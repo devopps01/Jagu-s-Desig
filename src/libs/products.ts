@@ -5,6 +5,7 @@ import { getDb } from '@/libs/mongo'
 import { slugify } from '@/libs/slug'
 import { searchRegex, tableResponse, type TableQuery } from '@/libs/table-query'
 import { withoutSareeWord } from '@/libs/public-label'
+import { productSizes } from '@/libs/rent-sizes'
 import type { StoreProduct } from '@web/data/catalog'
 
 export type ListingType = 'sale' | 'rent' | 'both'
@@ -32,10 +33,13 @@ export type ProductDoc = {
   design: string
   style: string
   styles?: string[]
+  sizes?: string[]
   details?: { label: string; value: string }[]
   seoTitle: string
   seoDescription: string
   status: ProductStatus
+  isBestSeller?: boolean
+  isTrending?: boolean
   rating: number
   reviews: number
   createdAt: Date
@@ -77,6 +81,7 @@ export const toStoreProduct = (doc: ProductDoc): StoreProduct => ({
       ? 'Chaniya Choli'
       : doc.style || 'Chaniya Choli',
   styles: Array.isArray(doc.styles) ? doc.styles.map(item => String(item || '').trim()).filter(Boolean) : [],
+  sizes: Array.isArray(doc.sizes) ? productSizes(doc.sizes) : undefined,
   details: Array.isArray(doc.details)
     ? doc.details
         .map(row => ({ label: String(row?.label || '').trim(), value: String(row?.value || '').trim() }))
@@ -84,6 +89,9 @@ export const toStoreProduct = (doc: ProductDoc): StoreProduct => ({
     : [],
   category: 'lehenga',
   collections: doc.collections || [],
+  isBestSeller: Boolean(doc.isBestSeller),
+  isTrending: Boolean(doc.isTrending),
+  badge: doc.isBestSeller ? 'Best seller' : doc.isTrending ? 'Trending' : undefined,
   image: uniqueImages(doc)[0] || doc.imageUrl,
   images: uniqueImages(doc),
   imageAlt: withoutSareeWord(doc.imageAlt),
@@ -107,6 +115,8 @@ const mapProduct = (doc: ProductDoc) => ({
   seoTitle: doc.seoTitle,
   seoDescription: doc.seoDescription,
   status: doc.status,
+  isBestSeller: Boolean(doc.isBestSeller),
+  isTrending: Boolean(doc.isTrending),
   createdAt: doc.createdAt,
   updatedAt: doc.updatedAt
 })
@@ -141,10 +151,47 @@ export const isAllProductsCollection = (slug?: string) => {
 
 export const listStoreProducts = async (collectionSlug?: string) => {
   const db = await getDb()
+  const slug = String(collectionSlug || '').trim().toLowerCase()
   const filter: Record<string, unknown> = { status: 'active' }
 
-  if (collectionSlug && !isAllProductsCollection(collectionSlug)) {
-    filter.collections = collectionSlug
+  if (slug === 'best-sellers') {
+    const rows = await db
+      .collection<ProductDoc>('Product')
+      .find({
+        status: 'active',
+        $or: [{ isBestSeller: true }, { collections: 'best-sellers' }, { reviews: { $gte: 20 } }]
+      })
+      .sort({ reviews: -1, createdAt: -1 })
+      .toArray()
+    const mapped = await applyGoogleRatingToProducts(rows.map(toStoreProduct))
+
+    if (mapped.length) return mapped
+
+    const all = await db.collection<ProductDoc>('Product').find({ status: 'active' }).sort({ createdAt: -1 }).limit(12).toArray()
+
+    return applyGoogleRatingToProducts(all.map(toStoreProduct))
+  }
+
+  if (slug === 'trending') {
+    const rows = await db
+      .collection<ProductDoc>('Product')
+      .find({
+        status: 'active',
+        $or: [{ isTrending: true }, { collections: 'trending' }]
+      })
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .toArray()
+    const mapped = await applyGoogleRatingToProducts(rows.map(toStoreProduct))
+
+    if (mapped.length) return mapped
+
+    const all = await db.collection<ProductDoc>('Product').find({ status: 'active' }).sort({ createdAt: -1 }).limit(12).toArray()
+
+    return applyGoogleRatingToProducts(all.map(toStoreProduct))
+  }
+
+  if (slug && !isAllProductsCollection(slug)) {
+    filter.collections = slug
   }
 
   const rows = await db.collection<ProductDoc>('Product').find(filter).sort({ createdAt: -1 }).toArray()
@@ -237,10 +284,13 @@ type ProductInput = {
   design: string
   style: string
   styles?: string[]
+  sizes?: string[]
   details?: { label: string; value: string }[]
   seoTitle: string
   seoDescription: string
   status?: ProductStatus
+  isBestSeller?: boolean
+  isTrending?: boolean
 }
 
 const normalize = (input: ProductInput) => {
@@ -279,6 +329,7 @@ const normalize = (input: ProductInput) => {
     occasion: input.occasion.trim(),
     design: input.design.trim(),
     styles: [...new Set((Array.isArray(input.styles) ? input.styles : []).map(item => String(item || '').trim()).filter(Boolean))].slice(0, 20),
+    sizes: productSizes(input.sizes),
     style: ([...new Set((Array.isArray(input.styles) ? input.styles : []).map(item => String(item || '').trim()).filter(Boolean))][0] ||
       input.style.trim() ||
       'Chaniya Choli'),
@@ -288,7 +339,9 @@ const normalize = (input: ProductInput) => {
       .slice(0, 30),
     seoTitle: (input.seoTitle || `${name} | Jagu's Designing`).trim(),
     seoDescription: (input.seoDescription || input.description).trim(),
-    status: input.status === 'inactive' ? 'inactive' : 'active'
+    status: input.status === 'inactive' ? 'inactive' : 'active',
+    isBestSeller: Boolean(input.isBestSeller),
+    isTrending: Boolean(input.isTrending)
   }
 }
 
@@ -326,6 +379,24 @@ export const updateProductStatus = async (id: string, status: ProductStatus) => 
   const db = await getDb()
 
   await db.collection('Product').updateOne({ _id: new ObjectId(id) }, { $set: { status, updatedAt: new Date() } })
+}
+
+export const patchProductFields = async (
+  id: string,
+  patch: { status?: ProductStatus; isBestSeller?: boolean; isTrending?: boolean }
+) => {
+  if (!ObjectId.isValid(id)) throw new Error('Invalid product')
+
+  const db = await getDb()
+  const $set: Record<string, unknown> = { updatedAt: new Date() }
+
+  if (patch.status === 'active' || patch.status === 'inactive') $set.status = patch.status
+  if (typeof patch.isBestSeller === 'boolean') $set.isBestSeller = patch.isBestSeller
+  if (typeof patch.isTrending === 'boolean') $set.isTrending = patch.isTrending
+
+  if (Object.keys($set).length <= 1) return
+
+  await db.collection('Product').updateOne({ _id: new ObjectId(id) }, { $set })
 }
 
 export const deleteProduct = async (id: string) => {

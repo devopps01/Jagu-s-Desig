@@ -34,28 +34,28 @@ const ScrollReveal = ({
 
     const observer = new IntersectionObserver(
       ([entry]) => {
+        if (!entry.isIntersecting) return
+
         const y = window.scrollY
         const goingDown = y >= lastY - 1
 
-        if (entry.isIntersecting) {
-          el.classList.toggle('is-from-top', !goingDown)
-          el.classList.toggle('is-from-bottom', goingDown)
-          el.classList.add('is-in')
-        } else {
-          el.classList.toggle('is-from-top', goingDown)
-          el.classList.toggle('is-from-bottom', !goingDown)
-          el.classList.remove('is-in')
-        }
-
+        el.classList.toggle('is-from-top', !goingDown)
+        el.classList.toggle('is-from-bottom', goingDown)
+        el.classList.add('is-in')
         lastY = y
+        observer.disconnect()
       },
-      { threshold: 0.12, rootMargin: '0px 0px -4% 0px' }
+      { threshold: 0.08, rootMargin: '40px 0px 40px 0px' }
     )
 
     observer.observe(el)
 
+    // Editor iframe / slow paint: never leave a blank hole under the fold.
+    const fallback = window.setTimeout(() => el.classList.add('is-in'), 600)
+
     return () => {
       window.removeEventListener('scroll', onScroll)
+      window.clearTimeout(fallback)
       observer.disconnect()
     }
   }, [])

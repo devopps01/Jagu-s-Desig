@@ -5,9 +5,9 @@ const trust = [
   { icon: 'tabler-sparkles', label: 'Hand embroidered' }
 ]
 
-const HomeTrust = () => (
+const HomeTrust = ({ items = trust }: { items?: { icon: string; label: string; showTitle?: boolean }[] }) => (
   <section className='vn-trust' aria-label='Store promises'>
-    {trust.map(item => (
+    {items.filter(item => item.showTitle !== false).map(item => (
       <div key={item.label}>
         <i className={item.icon} />
         <span>{item.label}</span>

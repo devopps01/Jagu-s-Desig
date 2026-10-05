@@ -16,7 +16,8 @@ import ProductAssure from '@web/components/ProductAssure'
 import ProductDealBanner from '@web/components/ProductDealBanner'
 import ProductInfoTabs from '@web/components/ProductInfoTabs'
 import HomeFeatures from '@web/components/HomeFeatures'
-import { RENT_SIZES } from '@/libs/rent-sizes'
+import { ExchangeIcon, GlobalIcon, HandmadeIcon, ShippingIcon } from '@web/components/BuyAssureIcons'
+import { productSizes } from '@/libs/rent-sizes'
 import { getViewedSlugs, rememberViewed } from '@web/lib/recently-viewed'
 import { storeWhatsAppHref } from '@/libs/contact-types'
 
@@ -26,7 +27,10 @@ const ProductPage = ({ slug, initialProduct }: { slug: string; initialProduct?: 
   const [product, setProduct] = useState<StoreProduct | null>(initialProduct || null)
   const [related, setRelated] = useState<StoreProduct[]>([])
   const [recent, setRecent] = useState<StoreProduct[]>([])
-  const [size, setSize] = useState('M')
+  const [size, setSize] = useState('')
+  const [customSize, setCustomSize] = useState('')
+  const [sizeError, setSizeError] = useState('')
+  const [sizeChart, setSizeChart] = useState(false)
   const [qty, setQty] = useState(1)
   const [shareNote, setShareNote] = useState('')
   const [pageUrl, setPageUrl] = useState('')
@@ -60,11 +64,30 @@ const ProductPage = ({ slug, initialProduct }: { slug: string; initialProduct?: 
     setPageUrl(window.location.href)
   }, [slug])
 
+  useEffect(() => {
+    const next = productSizes(product?.sizes)
+
+    setSize(current => (current && next.includes(current) ? current : next[0] || ''))
+  }, [product])
+
   if (!product) {
     return <p className='vn-section'>Loading product...</p>
   }
 
-  const cartOptions = { size, qty }
+  const chosenSize = size === 'Custom' ? (customSize.trim() ? `Custom · ${customSize.trim()}` : '') : size
+  const cartOptions = { size: chosenSize, qty }
+
+  const addToBag = (openCheckout = false) => {
+    if (size === 'Custom' && !customSize.trim()) {
+      setSizeError('Write your measurements, for example bust 36, waist 30, hip 40.')
+
+      return
+    }
+
+    setSizeError('')
+    addItem(product, openCheckout ? { ...cartOptions, open: false } : cartOptions)
+    if (openCheckout) router.push('/checkout')
+  }
 
   const shareProduct = async () => {
     const url = window.location.href
@@ -127,34 +150,34 @@ const ProductPage = ({ slug, initialProduct }: { slug: string; initialProduct?: 
 
           <ProductDealBanner />
 
-          <div className='vn-product-trust' aria-label='Store promises'>
-            <span>
-              <i className='tabler-truck' />
-              Free India shipping
-            </span>
-            <span>
-              <i className='tabler-cash' />
-              Cash on delivery
-            </span>
-            <span>
-              <i className='tabler-refresh' />
-              Easy exchange
-            </span>
-            <span>
-              <i className='tabler-shield-check' />
-              Quality checked
-            </span>
-          </div>
-
           <div className='vn-option-block'>
-            <strong>Size</strong>
-            <div className='vn-size-row'>
-              {RENT_SIZES.map(item => (
+            <div className='vn-size-head'>
+              <strong>Select Size</strong>
+              <button className='vn-size-chart' type='button' onClick={() => setSizeChart(true)}>
+                Size Chart
+              </button>
+            </div>
+            <div className='vn-size-row is-chart'>
+              {productSizes(product.sizes).map(item => (
                 <button key={item} type='button' className={size === item ? 'is-on' : ''} onClick={() => setSize(item)}>
                   {item}
                 </button>
               ))}
             </div>
+            {size === 'Custom' ? (
+              <label className='vn-field vn-custom-size'>
+                <span>Custom size</span>
+                <input
+                  value={customSize}
+                  placeholder='Bust, waist, hip or the fit you need'
+                  onChange={event => {
+                    setSizeError('')
+                    setCustomSize(event.target.value)
+                  }}
+                />
+                {sizeError ? <small className='vn-checkout-error'>{sizeError}</small> : <small className='vn-drawer-note'>This note is saved on the order.</small>}
+              </label>
+            ) : null}
           </div>
 
           <div className='vn-option-block'>
@@ -189,16 +212,13 @@ const ProductPage = ({ slug, initialProduct }: { slug: string; initialProduct?: 
           </div>
 
           <div className='vn-product-actions'>
-            <button className='vn-btn vn-btn-outline' type='button' onClick={() => addItem(product, cartOptions)}>
+            <button className='vn-btn vn-btn-outline' type='button' onClick={() => addToBag()}>
               Add to cart
             </button>
             <button
               className='vn-btn vn-btn-solid'
               type='button'
-              onClick={() => {
-                addItem(product, { ...cartOptions, open: false })
-                router.push('/checkout')
-              }}
+              onClick={() => addToBag(true)}
             >
               Buy now
             </button>
@@ -206,19 +226,24 @@ const ProductPage = ({ slug, initialProduct }: { slug: string; initialProduct?: 
 
           <ul className='vn-buy-assure' aria-label='Purchase promises'>
             <li>
-              <i className='tabler-world' />
-              <strong>Worldwide Shipping</strong>
-              <span>Ships fast, arrives globally safe</span>
+              <HandmadeIcon />
+              <strong>100% Handmade</strong>
+              <em>Crafted with love</em>
             </li>
             <li>
-              <i className='tabler-package' />
-              <strong>100% Original Product</strong>
-              <span>Authentic, verified and original</span>
+              <ShippingIcon />
+              <strong>Free Shipping</strong>
+              <em>Across India</em>
             </li>
             <li>
-              <i className='tabler-rosette-discount-check' />
-              <strong>Best Price Guaranteed</strong>
-              <span>Lowest price, top quality assured</span>
+              <ExchangeIcon />
+              <strong>Easy Exchange</strong>
+              <em>7 Days Policy</em>
+            </li>
+            <li>
+              <GlobalIcon />
+              <strong>Global Shipping</strong>
+              <em>Worldwide</em>
             </li>
           </ul>
 
@@ -253,6 +278,46 @@ const ProductPage = ({ slug, initialProduct }: { slug: string; initialProduct?: 
         </section>
       ) : null}
       <HomeFeatures />
+      {sizeChart ? (
+        <div className='vn-modal-backdrop' onClick={() => setSizeChart(false)}>
+          <div className='vn-modal vn-size-chart-modal' role='dialog' aria-modal='true' onClick={event => event.stopPropagation()}>
+            <div className='vn-modal-head'>
+              <h2>Size chart</h2>
+              <button className='vn-icon-btn' type='button' aria-label='Close' onClick={() => setSizeChart(false)}>
+                <i className='tabler-x' />
+              </button>
+            </div>
+            <p>Measurements are in inches. If you are between sizes, message us before you order.</p>
+            <table>
+              <thead>
+                <tr>
+                  <th>Size</th>
+                  <th>Bust</th>
+                  <th>Waist</th>
+                  <th>Hip</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ['XS', '32', '24', '34'],
+                  ['S', '34', '26', '36'],
+                  ['M', '36', '28', '38'],
+                  ['L', '38', '30', '40'],
+                  ['XL', '40', '32', '42'],
+                  ['XXL', '42', '34', '44'],
+                  ['Free Size', '44', '36', '46']
+                ].map(row => (
+                  <tr key={row[0]}>
+                    {row.map(cell => (
+                      <td key={cell}>{cell}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

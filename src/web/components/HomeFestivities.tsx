@@ -1,42 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
+import ResponsiveHomeImage from '@web/components/ResponsiveHomeImage'
 import { SectionHeader } from '@web/components/ProductGrid'
-
-const festivities = [
-  {
-    title: 'Haldi',
-    href: '/collections/haldi',
-    image: '/images/home/home-navratri.png'
-  },
-  {
-    title: 'Mehendi',
-    href: '/collections/mehendi',
-    image: '/images/home/home-party.png'
-  },
-  {
-    title: 'Sangeet',
-    href: '/collections/sangeet',
-    image: '/images/home/home-craft.png'
-  },
-  {
-    title: 'Cocktail',
-    href: '/collections/cocktail',
-    image: '/images/home/home-hero.png'
-  },
-  {
-    title: 'Wedding',
-    href: '/collections/wedding',
-    image: '/images/home/home-wedding.png'
-  },
-  {
-    title: 'Engagement',
-    href: '/collections/engagement',
-    image: '/images/home/home-engagement.png'
-  }
-]
+import { defaultFestivityItems, type HomeItem } from '@/libs/home-types'
 
 const CENTER_SCALE = 1.12
 const NEAR_SCALE = 0.96
@@ -88,8 +57,38 @@ const buildSlots = (width: number): SlotLayout => {
   return { cardW, left, gap, mobile, maxAbs: mobile ? 1 : 2 }
 }
 
-const HomeFestivities = () => {
-  const [active, setActive] = useState(2)
+type FestivityCard = {
+  id: string
+  title: string
+  href: string
+  image: string
+  imageMobile: string
+}
+
+const HomeFestivities = ({
+  title = 'Pre Wedding Festivities',
+  note = 'Styled for every function before the big day',
+  items
+}: {
+  title?: string
+  note?: string
+  items?: HomeItem[]
+}) => {
+  const cards = useMemo<FestivityCard[]>(() => {
+    const source = Array.isArray(items) && items.length ? items : defaultFestivityItems()
+
+    return source
+      .filter(item => item.enabled !== false && (item.image || item.imageMobile || item.title))
+      .map(item => ({
+        id: item.id,
+        title: item.showTitle === false ? '' : item.title,
+        href: item.href || '/collections/all',
+        image: item.image || '',
+        imageMobile: item.imageMobile || ''
+      }))
+  }, [items])
+
+  const [active, setActive] = useState(0)
   const [slots, setSlots] = useState<SlotLayout>({
     cardW: 180,
     left: [0, 0, 0, 0, 0],
@@ -105,9 +104,16 @@ const HomeFestivities = () => {
     active: false,
     moved: false
   })
-  const len = festivities.length
+  const len = cards.length
 
-  const go = (dir: -1 | 1) => setActive(value => (value + dir + len) % len)
+  useEffect(() => {
+    setActive(current => (len ? Math.min(current, len - 1) : 0))
+  }, [len])
+
+  const go = (dir: -1 | 1) => {
+    if (!len) return
+    setActive(value => (value + dir + len) % len)
+  }
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -129,7 +135,12 @@ const HomeFestivities = () => {
       if (width < 80) return
 
       const next = buildSlots(width)
+      // Media 4:5 + label, scaled from top — sizer uses the same value so labels are not clipped.
+      const labelH = next.mobile ? 48 : 64
+      const stageH = Math.ceil((next.cardW * 1.25 + labelH) * CENTER_SCALE + 40)
+
       el.style.setProperty('--fest-card-w', `${next.cardW}px`)
+      el.style.setProperty('--fest-stage-h', `${stageH}px`)
       el.dataset.mobile = next.mobile ? '1' : '0'
       setSlots(next)
     }
@@ -146,6 +157,8 @@ const HomeFestivities = () => {
   }, [])
 
   useEffect(() => {
+    if (!len) return
+
     const timer = window.setInterval(() => {
       if (pausedRef.current || dragRef.current.active) return
       setActive(value => (value + 1) % len)
@@ -156,7 +169,7 @@ const HomeFestivities = () => {
 
   useEffect(() => {
     const el = sliderRef.current
-    if (!el) return
+    if (!el || !len) return
 
     const pause = () => {
       pausedRef.current = true
@@ -213,17 +226,26 @@ const HomeFestivities = () => {
     }
   }, [len, slots.mobile])
 
+  if (!len) return null
+
   return (
     <section className='vn-festivities'>
       <div className='vn-fest-head-wrap'>
-        <SectionHeader title='Pre Wedding Festivities' note='Styled for every function before the big day' />
+        <SectionHeader title={title} note={note} />
       </div>
       <div className='vn-fest-slider' ref={sliderRef}>
         <p className='vn-fest-mark' aria-hidden='true'>
           Jagu&apos;s
         </p>
         <div className='vn-fest-stage' aria-roledescription='carousel' aria-live='polite'>
-          {festivities.map((item, index) => {
+          <div
+            className='vn-fest-stage-sizer'
+            aria-hidden='true'
+            style={{
+              height: `${Math.ceil((slots.cardW * 1.25 + (slots.mobile ? 48 : 64)) * CENTER_SCALE + 40)}px`
+            }}
+          />
+          {cards.map((item, index) => {
             const offset = loopOffset(index, active, len)
             const abs = Math.abs(offset)
             const visible = abs <= slots.maxAbs
@@ -233,7 +255,7 @@ const HomeFestivities = () => {
 
             return (
               <article
-                key={item.title}
+                key={item.id}
                 className={`vn-fest-card-wrap is-abs-${abs} ${offset === 0 ? 'is-center' : ''} ${visible ? 'is-on' : 'is-off'}`}
                 style={{
                   left: `${left}px`,
@@ -256,11 +278,13 @@ const HomeFestivities = () => {
                   }}
                 >
                   <div className='vn-fest-media'>
-                    <img src={item.image} alt={`${item.title} look`} draggable={false} />
+                    <ResponsiveHomeImage image={item.image} imageMobile={item.imageMobile} alt={`${item.title || 'Festivity'} look`} size='card' />
                   </div>
-                  <div className='vn-fest-label'>
-                    <span>{item.title}</span>
-                  </div>
+                  {item.title ? (
+                    <div className='vn-fest-label'>
+                      <span>{item.title}</span>
+                    </div>
+                  ) : null}
                 </Link>
               </article>
             )

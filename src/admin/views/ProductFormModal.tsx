@@ -25,6 +25,7 @@ import ProductDescriptionEditor from '@admin/views/ProductDescriptionEditor'
 import { FILTER_COLORS } from '@/libs/filter-utils'
 import { slugify } from '@/libs/slug'
 import type { ListingType } from '@/libs/products'
+import { PRODUCT_SIZES } from '@/libs/rent-sizes'
 
 const COLOR_HEX: Record<string, string> = {
   Red: '#c0392b',
@@ -84,10 +85,13 @@ export type ProductFormValue = {
   design: string
   style: string
   styles: string[]
+  sizes: string[]
   details: { label: string; value: string }[]
   seoTitle: string
   seoDescription: string
   status: 'active' | 'inactive'
+  isBestSeller?: boolean
+  isTrending?: boolean
 }
 
 const ProductFormModal = ({
@@ -273,6 +277,33 @@ const ProductFormModal = ({
               slotProps={{ popper: { sx: { zIndex: 1600 } } }}
             />
           </Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={Boolean(value.isTrending)}
+                  onChange={event => set({ isTrending: event.target.checked })}
+                />
+              }
+              label='Show in Trending (home page)'
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={Boolean(value.isBestSeller)}
+                  onChange={event => set({ isBestSeller: event.target.checked })}
+                />
+              }
+              label='Show in Most Selling (home page)'
+            />
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <Typography variant='caption' color='text.secondary'>
+              These flags fill the Trending and Most Selling sections under Pre Wedding Festivities. You can also toggle them from the product list.
+            </Typography>
+          </Grid>
           <Grid size={{ xs: 12, md: 4 }}>
             <TextField fullWidth label='Fabric' value={value.fabric} onChange={event => set({ fabric: event.target.value })} />
           </Grid>
@@ -347,6 +378,32 @@ const ProductFormModal = ({
               renderInput={params => <TextField {...params} label='Style' placeholder='Search styles' />}
               slotProps={{ popper: { sx: { zIndex: 1600 } } }}
             />
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <Typography variant='subtitle1'>Sizes</Typography>
+            <Typography variant='body2' color='text.secondary' className='mbe-2'>
+              Only the sizes you tick are shown on this product page.
+            </Typography>
+            <div className='flex flex-wrap gap-1'>
+              {PRODUCT_SIZES.map(item => (
+                <FormControlLabel
+                  key={item}
+                  control={
+                    <Checkbox
+                      size='small'
+                      checked={(value.sizes || []).includes(item)}
+                      onChange={event => {
+                        const current = value.sizes || []
+                        const sizes = event.target.checked ? [...current, item] : current.filter(size => size !== item)
+
+                        set({ sizes })
+                      }}
+                    />
+                  }
+                  label={item}
+                />
+              ))}
+            </div>
           </Grid>
           <Grid size={{ xs: 12 }}>
             <Typography variant='subtitle1'>Product details</Typography>

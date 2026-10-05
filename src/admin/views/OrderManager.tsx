@@ -283,7 +283,8 @@ const OrderManager = () => {
             ) : null}
             {open.items.map(item => (
               <Typography key={`${item.title}-${item.qty}-${item.lineTotal}`} variant='body2'>
-                {item.title} × {item.qty} — {formatPrice(item.lineTotal)}
+                {item.title}
+                {item.size ? ` · Size ${item.size}` : ''} × {item.qty} — {formatPrice(item.lineTotal)}
               </Typography>
             ))}
             <Box sx={{ display: 'grid', gap: 0.75, maxWidth: 360, ml: 'auto', width: '100%' }}>

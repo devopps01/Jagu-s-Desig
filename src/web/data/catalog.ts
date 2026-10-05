@@ -16,6 +16,10 @@ export type StoreProduct = {
   rating: number
   reviews: number
   badge?: ProductBadge
+  /** Set in admin — included in home Best Sellers / Most Selling */
+  isBestSeller?: boolean
+  /** Set in admin — included in home Trending section */
+  isTrending?: boolean
   fabric?: string
   occasion?: string
   color?: string
@@ -24,6 +28,7 @@ export type StoreProduct = {
   style?: string
   styles?: string[]
   details?: { label: string; value: string }[]
+  sizes?: string[]
   category: 'saree' | 'lehenga' | 'kurti' | 'dress'
   collections: string[]
   image: string
@@ -591,6 +596,8 @@ export const collectionTitles: Record<string, string> = {
   all: 'All Products',
   'all-products': 'All Products',
   'best-sellers': 'Best Sellers',
+  trending: 'Trending',
+  engagement: 'Engagement',
   'under-999': 'Under ₹999',
   'big-sale': 'Big Sale',
   dresses: 'Dresses',
@@ -612,7 +619,6 @@ export const collectionTitles: Record<string, string> = {
   cocktail: 'Cocktail',
   festive: 'Festive',
   party: 'Party',
-  engagement: 'Engagement',
   navratri: 'Navratri',
   'latest-trend': 'Latest Trend',
   office: 'Office Wear',
@@ -682,20 +688,52 @@ export const discountPercent = (mrp?: number, price?: number) => {
 
 export const getProduct = (slug: string) => products.find(item => item.slug === slug)
 
-export const getCollectionProducts = (slug: string) => {
-  if (slug === 'under-999') return products.filter(item => item.price <= 999)
-  if (slug === '1000-1499') return products.filter(item => item.price >= 1000 && item.price <= 1499)
-  if (slug === '1500-1999') return products.filter(item => item.price >= 1500 && item.price <= 1999)
-  if (slug === 'premium') return products.filter(item => item.price >= 2000)
-  if (slug === 'best-sellers') return products.filter(item => item.badge === 'Best seller' || item.reviews >= 20)
-  if (slug === 'big-sale') return products.filter(item => Boolean(item.compareAt))
-  if (slug === 'accessories' || slug === 'scarfs' || slug === 'dupatta') return products.filter(item => item.category === 'dress').slice(0, 4)
-  if (slug === 'gifting') return products.filter(item => item.category === 'saree').slice(0, 8)
+export const isProductBestSeller = (item: StoreProduct) =>
+  Boolean(item.isBestSeller) ||
+  item.badge === 'Best seller' ||
+  item.collections?.includes('best-sellers') ||
+  (item.reviews ?? 0) >= 20
 
-  const matched = products.filter(item => item.collections.includes(slug) || item.category === slug)
+export const isProductTrending = (item: StoreProduct) =>
+  Boolean(item.isTrending) ||
+  item.badge === 'Trending' ||
+  item.collections?.includes('trending')
 
-  return matched.length ? matched : products
+export const filterProductsForCollection = (list: StoreProduct[], slug: string) => {
+  const key = String(slug || '').trim().toLowerCase()
+
+  if (!key || key === 'latest' || key === 'all') return list
+  if (key === 'under-999') return list.filter(item => item.price <= 999)
+  if (key === '1000-1499') return list.filter(item => item.price >= 1000 && item.price <= 1499)
+  if (key === '1500-1999') return list.filter(item => item.price >= 1500 && item.price <= 1999)
+  if (key === 'premium') return list.filter(item => item.price >= 2000)
+  if (key === 'trending') {
+    const picked = list.filter(isProductTrending)
+
+    return picked.length ? picked : list.slice(0, 12)
+  }
+  if (key === 'best-sellers') {
+    const picked = list.filter(isProductBestSeller).sort((a, b) => (b.reviews ?? 0) - (a.reviews ?? 0))
+
+    return picked.length ? picked : list.slice(0, 12)
+  }
+  if (key === 'big-sale') return list.filter(item => Boolean(item.compareAt))
+  if (key === 'accessories' || key === 'scarfs' || key === 'dupatta') return list.filter(item => item.category === 'dress').slice(0, 4)
+  if (key === 'gifting') return list.filter(item => item.category === 'saree').slice(0, 8)
+
+  const matched = list.filter(
+    item =>
+      item.collections.includes(key) ||
+      item.category === key ||
+      String(item.occasion || '')
+        .toLowerCase()
+        .includes(key.replace(/-/g, ' '))
+  )
+
+  return matched.length ? matched : list
 }
+
+export const getCollectionProducts = (slug: string) => filterProductsForCollection(products, slug)
 
 export const graceInBloom = products.slice(0, 8)
 export const spotlight = products.slice(8, 16)

@@ -126,6 +126,19 @@ export const defaultFilters = (): FilterDoc[] => [
   }
 ]
 
+export const styleValues = (product: StoreProduct) => {
+  const fromList = (product.styles || []).map(item => item.trim()).filter(Boolean)
+
+  if (fromList.length) return fromList
+
+  const fromStyle = (product.style || '')
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean)
+
+  return fromStyle.length ? fromStyle : ['Chaniya Choli']
+}
+
 export const getProductFilterValue = (product: StoreProduct, field: FilterKey) => {
   if (field === 'price') return String(product.sellingPrice || product.rentPrice || product.price)
   if (field === 'fabric') return product.fabric || ''
@@ -150,7 +163,7 @@ export const getProductFilterValue = (product: StoreProduct, field: FilterKey) =
 
     return ''
   }
-  if (field === 'style') return product.style || 'Chaniya Choli'
+  if (field === 'style') return styleValues(product)[0] || ''
 
   return ''
 }
@@ -167,5 +180,9 @@ export const optionMatchesProduct = (product: StoreProduct, field: FilterKey, op
   const raw = getProductFilterValue(product, field)
   if (!raw) return false
 
-  return slugify(raw) === slugify(option.value) || raw.toLowerCase().includes(option.label.toLowerCase()) || option.label.toLowerCase().includes(raw.toLowerCase())
+  if (field === 'style') {
+    return styleValues(product).some(token => slugify(token) === slugify(option.value) || slugify(token) === slugify(option.label))
+  }
+
+  return slugify(raw) === slugify(option.value) || slugify(raw) === slugify(option.label)
 }

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 
 import { formatPrice, type StoreProduct } from '@web/data/catalog'
+import { imageAttrs } from '@web/lib/image-src'
 
 const HeaderSearch = ({ variant = 'bar' }: { variant?: 'bar' | 'icon' }) => {
   const router = useRouter()
@@ -104,7 +105,7 @@ const HeaderSearch = ({ variant = 'bar' }: { variant?: 'bar' | 'icon' }) => {
                   setExpanded(false)
                 }}
               >
-                <img src={product.image} alt='' />
+                <img {...imageAttrs(product.image, 'thumb')} alt='' loading='lazy' decoding='async' />
                 <span>
                   <strong>{product.title}</strong>
                   <em>{formatPrice(product.price)}</em>

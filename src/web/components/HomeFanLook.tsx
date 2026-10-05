@@ -1,78 +1,99 @@
-import Link from 'next/link'
+'use client'
 
-const frames = [
-  {
-    id: 'outer-left',
-    src: '/images/home/home-engagement.png',
-    alt: 'Pastel engagement look — side view'
-  },
-  {
-    id: 'inner-left',
-    src: '/images/home/home-party.png',
-    alt: 'Festive party chaniya choli — full look'
-  },
-  {
-    id: 'center',
-    src: '/images/home/home-navratri.png',
-    alt: 'Signature festive look — front portrait'
-  },
-  {
-    id: 'inner-right',
-    src: '/images/home/home-wedding.png',
-    alt: 'Bridal edit — ceremony silhouette'
-  },
-  {
-    id: 'outer-right',
-    src: '/images/home/home-craft.png',
-    alt: 'Handcrafted embroidery detail look'
-  }
-] as const
+import Link from 'next/link'
+import { useMemo } from 'react'
+
+import ResponsiveHomeImage from '@web/components/ResponsiveHomeImage'
+import { defaultFanItems, type HomeItem } from '@/libs/home-types'
 
 const dandiyaArt = {
   left: '/images/home/fan-dandiya-left.png',
   right: '/images/home/fan-dandiya-right.png'
 } as const
 
-const HomeFanLook = () => (
-  <section className='vn-section vn-fan-look' aria-label='Most trending Navratri looks'>
-    <div className='vn-fan-look-frame'>
-      <div className='vn-fan-head-wrap'>
-        <div className='vn-section-head vn-fan-head'>
-          <p className='vn-section-note'>Current most trending requirement</p>
-          <div className='vn-rule' />
-          <h2>Navratri Favourites</h2>
+type FanSlot = 'outer-left' | 'inner-left' | 'center' | 'inner-right' | 'outer-right'
+
+const slotsForCount = (count: number): FanSlot[] => {
+  if (count <= 0) return []
+  if (count === 1) return ['center']
+  if (count === 2) return ['inner-left', 'inner-right']
+  if (count === 3) return ['inner-left', 'center', 'inner-right']
+  if (count === 4) return ['outer-left', 'inner-left', 'inner-right', 'outer-right']
+
+  return ['outer-left', 'inner-left', 'center', 'inner-right', 'outer-right']
+}
+
+const HomeFanLook = ({
+  note = 'Current most trending requirement',
+  title = 'Navratri Favourites',
+  href = '/collections/festive',
+  items
+}: {
+  note?: string
+  title?: string
+  href?: string
+  items?: HomeItem[]
+}) => {
+  const frames = useMemo(() => {
+    const source = Array.isArray(items) && items.length ? items : defaultFanItems()
+    const enabled = source.filter(item => item.enabled !== false && (item.image || item.imageMobile || item.title))
+    const visible = enabled.slice(0, 5)
+    const slots = slotsForCount(visible.length)
+
+    return visible.map((item, index) => ({
+      id: item.id,
+      slot: slots[index],
+      title: item.showTitle === false ? '' : item.title,
+      alt: item.text || item.title || 'Navratri look',
+      href: item.href || href || '/collections/festive',
+      image: item.image || '',
+      imageMobile: item.imageMobile || ''
+    }))
+  }, [href, items])
+
+  return (
+    <section className='vn-section vn-fan-look' aria-label='Most trending Navratri looks'>
+      <div className='vn-fan-look-frame'>
+        {(note || title) && (
+          <div className='vn-fan-head-wrap'>
+            <div className='vn-section-head vn-fan-head'>
+              {note ? <p className='vn-section-note'>{note}</p> : null}
+              {note && title ? <div className='vn-rule' /> : null}
+              {title ? <h2>{title}</h2> : null}
+            </div>
+          </div>
+        )}
+
+        <img
+          className='vn-fan-dandiya is-left'
+          src={dandiyaArt.left}
+          alt=''
+          aria-hidden='true'
+          draggable={false}
+        />
+        <img
+          className='vn-fan-dandiya is-right'
+          src={dandiyaArt.right}
+          alt=''
+          aria-hidden='true'
+          draggable={false}
+        />
+
+        <div className='vn-fan-stack'>
+          {frames.map(frame => (
+            <Link
+              key={frame.id}
+              href={frame.href}
+              className={`vn-fan-card is-${frame.slot}`}
+              aria-label={frame.alt}
+            >
+              <ResponsiveHomeImage image={frame.image} imageMobile={frame.imageMobile} alt={frame.alt} />
+            </Link>
+          ))}
         </div>
       </div>
-
-      <img
-        className='vn-fan-dandiya is-left'
-        src={dandiyaArt.left}
-        alt=''
-        aria-hidden='true'
-        draggable={false}
-      />
-      <img
-        className='vn-fan-dandiya is-right'
-        src={dandiyaArt.right}
-        alt=''
-        aria-hidden='true'
-        draggable={false}
-      />
-
-      <div className='vn-fan-stack'>
-        {frames.map(frame => (
-          <Link
-            key={frame.id}
-            href='/collections/festive'
-            className={`vn-fan-card is-${frame.id}`}
-            aria-label={frame.alt}
-          >
-            <img src={frame.src} alt={frame.alt} />
-          </Link>
-        ))}
-      </div>
-    </div>
-  </section>
-)
+    </section>
+  )
+}
 
 export default HomeFanLook

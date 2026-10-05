@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { requireAdminSession } from '@/libs/admin-session'
-import { deleteProduct, updateProduct, updateProductStatus } from '@/libs/products'
+import { deleteProduct, patchProductFields, updateProduct, updateProductStatus } from '@/libs/products'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -35,7 +35,20 @@ export async function PATCH(req: Request, { params }: Params) {
   try {
     const body = await req.json()
 
-    await updateProductStatus(id, body.status === 'inactive' ? 'inactive' : 'active')
+    if (
+      typeof body.isBestSeller === 'boolean' ||
+      typeof body.isTrending === 'boolean' ||
+      body.status === 'active' ||
+      body.status === 'inactive'
+    ) {
+      await patchProductFields(id, {
+        status: body.status === 'inactive' ? 'inactive' : body.status === 'active' ? 'active' : undefined,
+        isBestSeller: typeof body.isBestSeller === 'boolean' ? body.isBestSeller : undefined,
+        isTrending: typeof body.isTrending === 'boolean' ? body.isTrending : undefined
+      })
+    } else {
+      await updateProductStatus(id, body.status === 'inactive' ? 'inactive' : 'active')
+    }
 
     return NextResponse.json({ ok: true })
   } catch (error) {

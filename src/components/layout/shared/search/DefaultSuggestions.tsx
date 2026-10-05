@@ -22,109 +22,44 @@ type DefaultSuggestionsType = {
 
 const defaultSuggestions: DefaultSuggestionsType[] = [
   {
-    sectionLabel: 'Popular Searches',
+    sectionLabel: 'Catalog',
     items: [
-      {
-        label: 'Analytics',
-        href: '/dashboards/analytics',
-        icon: 'tabler-trending-up'
-      },
-      {
-        label: 'CRM',
-        href: '/dashboards/crm',
-        icon: 'tabler-chart-pie-2'
-      },
-      {
-        label: 'eCommerce',
-        href: '/dashboards/ecommerce',
-        icon: 'tabler-shopping-cart'
-      },
-      {
-        label: 'User List',
-        href: '/apps/user/list',
-        icon: 'tabler-file-description'
-      }
+      { label: 'Products', href: '/store/products', icon: 'tabler-shirt' },
+      { label: 'Categories', href: '/store/categories', icon: 'tabler-category' },
+      { label: 'Image Upload', href: '/store/media', icon: 'tabler-photo' },
+      { label: 'Collection Filters', href: '/store/filters', icon: 'tabler-filter' }
     ]
   },
   {
-    sectionLabel: 'Apps',
+    sectionLabel: 'Orders & offers',
     items: [
-      {
-        label: 'Calendar',
-        href: '/apps/calendar',
-        icon: 'tabler-calendar'
-      },
-      {
-        label: 'Invoice List',
-        href: '/apps/invoice/list',
-        icon: 'tabler-file-info'
-      },
-      {
-        label: 'User List',
-        href: '/apps/user/list',
-        icon: 'tabler-file-invoice'
-      },
-      {
-        label: 'Roles & Permissions',
-        href: '/apps/roles',
-        icon: 'tabler-lock'
-      }
+      { label: 'Orders & billing', href: '/store/orders', icon: 'tabler-file-invoice' },
+      { label: 'Rent bookings', href: '/store/rentals', icon: 'tabler-calendar' },
+      { label: 'Discounts', href: '/store/discounts', icon: 'tabler-discount' },
+      { label: 'Payment methods', href: '/store/payments', icon: 'tabler-credit-card' }
     ]
   },
   {
-    sectionLabel: 'Pages',
+    sectionLabel: 'Website',
     items: [
-      {
-        label: 'User Profile',
-        href: '/pages/user-profile',
-        icon: 'tabler-user'
-      },
-      {
-        label: 'Account Settings',
-        href: '/pages/account-settings',
-        icon: 'tabler-settings'
-      },
-      {
-        label: 'Pricing',
-        href: '/pages/pricing',
-        icon: 'tabler-currency-dollar'
-      },
-      {
-        label: 'FAQ',
-        href: '/pages/faq',
-        icon: 'tabler-help-circle'
-      }
+      { label: 'Website editor', href: '/store/home-page', icon: 'tabler-world' },
+      { label: 'Contact inquiries', href: '/store/contact', icon: 'tabler-mail' },
+      { label: 'Reviews & ratings', href: '/store/reviews', icon: 'tabler-star' },
+      { label: 'Google reviews', href: '/store/google-reviews', icon: 'tabler-brand-google' }
     ]
   },
   {
-    sectionLabel: 'Forms & Charts',
+    sectionLabel: 'Customers',
     items: [
-      {
-        label: 'Form Layouts',
-        href: '/forms/form-layouts',
-        icon: 'tabler-layout'
-      },
-      {
-        label: 'Form Validation',
-        href: '/forms/form-validation',
-        icon: 'tabler-checkup-list'
-      },
-      {
-        label: 'Form Wizard',
-        href: '/forms/form-wizard',
-        icon: 'tabler-git-merge'
-      },
-      {
-        label: 'Apex Charts',
-        href: '/charts/apex-charts',
-        icon: 'tabler-chart-ppf'
-      }
+      { label: 'Website Users', href: '/store/users', icon: 'tabler-users' },
+      { label: 'Wishlists', href: '/store/wishlists', icon: 'tabler-heart' },
+      { label: 'Newsletter subscribers', href: '/store/newsletter-subscribers', icon: 'tabler-mail-opened' },
+      { label: 'Push campaigns', href: '/store/push-campaigns', icon: 'tabler-bell' }
     ]
   }
 ]
 
 const DefaultSuggestions = ({ setOpen }: { setOpen: (value: boolean) => void }) => {
-  // Hooks
   const { lang: locale } = useParams()
 
   return (

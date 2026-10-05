@@ -9,6 +9,7 @@ import OrderRequestForm from '@web/components/OrderRequestForm'
 import ReviewWriteModal from '@web/components/ReviewWriteModal'
 import { useLoginModal } from '@web/context/LoginModalContext'
 import { canCancelOrder, canReturnOrder } from '@/libs/order-request-types'
+import { imageAttrs } from '@web/lib/image-src'
 
 type TrackItem = {
   title: string
@@ -146,10 +147,10 @@ const TrackOrderPage = () => {
             <span className='vn-order-status'>{order.status}</span>
           </div>
           {!stopped ? (
-            <ol className='vn-track-steps'>
+            <ol className='vn-track-steps' aria-label='Order progress'>
               {steps.map((step, index) => (
-                <li key={step} className={index <= activeIndex ? 'is-on' : ''}>
-                  {step}
+                <li key={step} className={index < activeIndex ? 'is-done' : index === activeIndex ? 'is-on is-current' : ''}>
+                  <span>{step}</span>
                 </li>
               ))}
             </ol>
@@ -162,7 +163,7 @@ const TrackOrderPage = () => {
             {order.items.map(item => (
               <div key={`${item.slug}-${item.size || ''}`} className='vn-order-item-row'>
                 <Link href={`/products/${item.slug}`}>
-                  <img src={item.image} alt={item.title} />
+                  <img {...imageAttrs(item.image, 'thumb')} alt={item.title} loading='lazy' decoding='async' />
                   <span>
                     {item.title}
                     {item.size ? ` · Size ${item.size}` : ''} × {item.qty}

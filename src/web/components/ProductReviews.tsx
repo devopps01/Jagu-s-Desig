@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { useLoginModal } from '@web/context/LoginModalContext'
+import { imageAttrs } from '@web/lib/image-src'
 
 const MAX_PHOTOS = 4
 
@@ -231,7 +232,7 @@ const ProductReviews = ({ slug, onSummary }: { slug: string; onSummary?: (averag
                 <div className={`vn-review-card-photos count-${Math.min(item.images.length, 4)}`}>
                   {item.images.slice(0, 4).map(src => (
                     <button key={src} type='button' onClick={() => setLightbox(src)} aria-label='View review photo'>
-                      <img src={src} alt='' />
+                      <img {...imageAttrs(src, 'thumb')} alt='' loading='lazy' decoding='async' />
                     </button>
                   ))}
                 </div>
@@ -287,7 +288,7 @@ const ProductReviews = ({ slug, onSummary }: { slug: string; onSummary?: (averag
                     <div className='vn-review-upload'>
                       {previews.map(item => (
                         <div key={item.key} className='vn-review-thumb'>
-                          <img src={item.src} alt='' />
+                          <img {...imageAttrs(item.src, 'thumb')} alt='' />
                           <button
                             type='button'
                             aria-label='Remove photo'
@@ -325,7 +326,7 @@ const ProductReviews = ({ slug, onSummary }: { slug: string; onSummary?: (averag
       {lightbox && typeof document !== 'undefined'
         ? createPortal(
             <div className='vn-modal-backdrop is-lightbox' onClick={() => setLightbox('')}>
-              <img src={lightbox} alt='' onClick={event => event.stopPropagation()} />
+              <img {...imageAttrs(lightbox, 'full')} alt='' onClick={event => event.stopPropagation()} />
               <button className='vn-icon-btn' type='button' onClick={() => setLightbox('')} aria-label='Close'>
                 <i className='tabler-x' />
               </button>

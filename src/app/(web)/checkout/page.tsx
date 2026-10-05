@@ -13,6 +13,7 @@ import type { SavedAddress } from '@/libs/addresses-types'
 import { paymentMethodIcon, type PaymentMethod } from '@/libs/payment-methods-types'
 import { offerAmount, type OfferType } from '@/libs/offers'
 import { calcGstAmount, defaultGstSettings, type GstSettings } from '@/libs/gst-types'
+import { imageAttrs } from '@web/lib/image-src'
 import { loadRazorpay, openRazorpayCheckout, nationalMobile, razorpayContact } from '@web/lib/razorpay-checkout'
 
 type AppliedDiscount = {
@@ -557,7 +558,7 @@ const CheckoutPage = () => {
                 return (
                   <article key={line.id} className='vn-checkout-product'>
                     <Link href={`/products/${line.product.slug}`} className='vn-cart-thumb'>
-                      <img src={line.product.image} alt={line.product.title} />
+                      <img {...imageAttrs(line.product.image, 'thumb')} alt={line.product.title} loading='lazy' decoding='async' />
                     </Link>
                     <div>
                       <h3>

@@ -203,6 +203,21 @@ ul:not([class]) {
   font-size: 1.5rem;
 }
 
+/* Website editor live preview: keep real desktop/mobile viewport inside scaled iframe */
+iframe.jagu-site-preview-frame {
+  display: block !important;
+  max-width: none !important;
+  width: var(--jagu-preview-w, 1440px) !important;
+  min-width: var(--jagu-preview-w, 1440px) !important;
+  height: var(--jagu-preview-h, 900px) !important;
+  min-height: var(--jagu-preview-h, 900px) !important;
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: #fff;
+  transform-origin: top left;
+}
+
 /* Fix width issue for the input-otp component */
 input[autocomplete='one-time-code'][data-input-otp='true'] {
   inline-size: 100% !important;

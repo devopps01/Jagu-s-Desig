@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 import { formatPrice } from '@web/data/catalog'
+import { imageAttrs } from '@web/lib/image-src'
 import { ProductGrid } from '@web/components/ProductGrid'
 import OrderRequestForm from '@web/components/OrderRequestForm'
 import OrderBill from '@web/components/OrderBill'
@@ -196,7 +197,7 @@ const AccountDesk = () => {
                       {order.items.map(item => (
                         <div key={`${item.slug}-${item.size || ''}`} className='vn-order-item-row'>
                           <Link href={`/products/${item.slug}`}>
-                            <img src={item.image} alt={item.title} />
+                            <img {...imageAttrs(item.image, 'thumb')} alt={item.title} loading='lazy' decoding='async' />
                             <span>
                               {item.title}
                               {item.size ? ` · Size ${item.size}` : ''} × {item.qty}

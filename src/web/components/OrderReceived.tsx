@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
 import { formatPrice } from '@web/data/catalog'
+import { imageAttrs } from '@web/lib/image-src'
 
 export type ReceiptItem = {
   title: string
@@ -54,7 +55,7 @@ const OrderReceived = ({ receipt }: { receipt: OrderReceipt }) => {
             <div className='vn-receipt-items'>
               {receipt.items.map(item => (
                 <article key={`${item.title}-${item.size}-${item.unit}`}>
-                  {item.image ? <img src={item.image} alt={item.title} /> : <span className='vn-receipt-photo' />}
+                  {item.image ? <img {...imageAttrs(item.image, 'thumb')} alt={item.title} loading='lazy' decoding='async' /> : <span className='vn-receipt-photo' />}
                   <div>
                     <h3>{item.title}</h3>
                     <p>

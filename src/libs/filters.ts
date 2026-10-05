@@ -1,6 +1,6 @@
 import { getDb } from '@/libs/mongo'
 import { listStoreProducts } from '@/libs/products'
-import { defaultFilters, getProductFilterValue, type FilterDoc } from '@/libs/filter-utils'
+import { defaultFilters, getProductFilterValue, optionMatchesProduct, styleValues, type FilterDoc } from '@/libs/filter-utils'
 import { slugify } from '@/libs/slug'
 
 export type { FilterDoc, FilterKey, FilterOption, FilterSource } from '@/libs/filter-utils'
@@ -61,12 +61,25 @@ export const resolveCollectionFilters = async (slug: string) => {
       .filter(item => item.show)
       .map(item => {
         const staticOptions = (item.options || []).filter(option => option.active !== false)
-        const productOptions =
+        const present =
+          item.key === 'style'
+            ? Array.from(new Set(products.flatMap(product => styleValues(product))))
+            : Array.from(new Set(products.map(product => getProductFilterValue(product, item.key)).filter(Boolean)))
+
+        const options =
           item.key === 'price'
-            ? staticOptions
-            : Array.from(new Set(products.map(product => getProductFilterValue(product, item.key)).filter(Boolean))).map(
-                label => ({ label, value: slugify(label), active: true })
-              )
+            ? staticOptions.filter(option => products.some(product => optionMatchesProduct(product, 'price', option)))
+            : present.map(label => {
+                const saved = staticOptions.find(
+                  option => slugify(option.value) === slugify(label) || slugify(option.label) === slugify(label)
+                )
+
+                return {
+                  label: saved?.label || label,
+                  value: saved?.value || slugify(label),
+                  active: true
+                }
+              })
 
         return {
           key: item.key,
@@ -74,9 +87,9 @@ export const resolveCollectionFilters = async (slug: string) => {
           type: item.type,
           source: item.source,
           showPills: item.showPills,
-          options: item.source === 'product' && item.key !== 'price' ? productOptions : staticOptions
+          options
         }
       })
-      .filter(item => item.key === 'price' || item.options.length > 0)
+      .filter(item => item.options.length > 0)
   }
 }

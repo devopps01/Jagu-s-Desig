@@ -22,8 +22,7 @@ const SELECTORS = [
   'main .vn-features',
   'main .vn-festivities',
   'main .vn-fan-look',
-  'main .vn-video-shop',
-  '.vn-footer'
+  'main .vn-video-shop'
 ].join(', ')
 
 const StorefrontMotion = () => {
@@ -36,6 +35,11 @@ const StorefrontMotion = () => {
     const reveal = (el: Element) => {
       if (seen.has(el)) return
       if (el.classList.contains('vn-reveal') || el.closest('.vn-reveal')) return
+
+      const rect = el.getBoundingClientRect()
+
+      if (rect.height < 8) return
+
       seen.add(el)
       el.classList.add('vn-reveal', 'is-from-bottom')
 
@@ -43,9 +47,9 @@ const StorefrontMotion = () => {
         el.classList.add('is-in')
       }
 
-      const rect = el.getBoundingClientRect()
-      if (rect.bottom > 0 && rect.top < window.innerHeight) {
+      if (rect.bottom > 0 && rect.top < window.innerHeight + 80) {
         show()
+
         return
       }
 
@@ -55,7 +59,7 @@ const StorefrontMotion = () => {
           show()
           observer.disconnect()
         },
-        { threshold: 0.01, rootMargin: '0px 0px -4% 0px' }
+        { threshold: 0.01, rootMargin: '80px 0px 80px 0px' }
       )
 
       observers.push(observer)
@@ -67,13 +71,18 @@ const StorefrontMotion = () => {
     }
 
     scan()
-
     const mo = new MutationObserver(() => scan())
     mo.observe(document.querySelector('main') || document.body, { childList: true, subtree: true })
+    window.addEventListener('load', scan)
+    const fallback = window.setTimeout(() => {
+      document.querySelectorAll('.vn-reveal:not(.is-in)').forEach(el => el.classList.add('is-in'))
+    }, 400)
 
     return () => {
       observers.forEach(observer => observer.disconnect())
       mo.disconnect()
+      window.removeEventListener('load', scan)
+      window.clearTimeout(fallback)
     }
   }, [])
 

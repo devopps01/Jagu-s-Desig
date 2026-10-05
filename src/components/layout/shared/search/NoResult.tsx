@@ -18,25 +18,12 @@ type NoResultData = {
 }
 
 const noResultData: NoResultData[] = [
-  {
-    label: 'Analytics',
-    href: '/dashboards/analytics',
-    icon: 'tabler-chart-pie-2'
-  },
-  {
-    label: 'User Profile',
-    href: '/pages/user-profile',
-    icon: 'tabler-user'
-  },
-  {
-    label: 'CRM',
-    href: '/dashboards/crm',
-    icon: 'tabler-chart-donut-3'
-  }
+  { label: 'Products', href: '/store/products', icon: 'tabler-shirt' },
+  { label: 'Website editor', href: '/store/home-page', icon: 'tabler-world' },
+  { label: 'Orders & billing', href: '/store/orders', icon: 'tabler-file-invoice' }
 ]
 
 const NoResult = ({ searchValue, setOpen }: { searchValue: string; setOpen: (value: boolean) => void }) => {
-  // Hooks
   const { lang: locale } = useParams()
 
   return (

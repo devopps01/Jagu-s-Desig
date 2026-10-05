@@ -5,14 +5,42 @@ import Link from 'next/link'
 import { useKeenSlider } from 'keen-slider/react'
 import 'keen-slider/keen-slider.min.css'
 
-const slides = [
+import ResponsiveHomeImage from '@web/components/ResponsiveHomeImage'
+
+type HeroSlide = {
+  image: string
+  imageMobile?: string
+  showKicker?: boolean
+  kicker: string
+  showTitle?: boolean
+  title: string
+  showText?: boolean
+  text: string
+  showButton?: boolean
+  buttonLabel?: string
+  cta?: string
+  href: string
+  showSecondButton?: boolean
+  secondLabel?: string
+  secondHref?: string
+}
+
+const defaultSlides: HeroSlide[] = [
   {
     image: '/images/home/home-hero.png',
     kicker: 'Jagu’s Designing',
     title: 'Tradition, tailored for today',
     text: 'Handcrafted chaniya choli for Navratri, weddings and celebrations.',
     href: '/collections/all',
-    cta: 'Shop collection'
+    cta: 'Shop collection',
+    buttonLabel: 'Shop collection',
+    showKicker: true,
+    showTitle: true,
+    showText: true,
+    showButton: true,
+    showSecondButton: true,
+    secondLabel: 'Shop on video',
+    secondHref: '/video'
   },
   {
     image: '/images/home/home-navratri.png',
@@ -44,11 +72,16 @@ const slides = [
     title: 'Festive after dark',
     text: 'Emerald and gold silhouettes for receptions and cocktail hours.',
     href: '/collections/party',
-    cta: 'Shop party'
+    cta: 'Shop party',
+    buttonLabel: 'Shop party',
+    showKicker: true,
+    showTitle: true,
+    showText: true,
+    showButton: true
   }
 ]
 
-const HomeHero = () => {
+const HomeHero = ({ slides = defaultSlides }: { slides?: HeroSlide[] }) => {
   const [current, setCurrent] = useState(0)
   const [sliderRef, instanceRef] = useKeenSlider<HTMLDivElement>(
     {
@@ -92,20 +125,24 @@ const HomeHero = () => {
   return (
     <section className='vn-hero' aria-label='Featured collections'>
       <div ref={sliderRef} className='keen-slider vn-hero-slider'>
-        {slides.map(slide => (
+        {slides.map((slide, index) => (
           <article key={slide.title} className='keen-slider__slide vn-hero-slide'>
-            <img src={slide.image} alt={slide.title} />
+            <ResponsiveHomeImage image={slide.image} imageMobile={slide.imageMobile} alt={slide.title} size='banner' loading={index === 0 ? 'eager' : 'lazy'} />
             <div className='vn-hero-copy'>
-              <p className='vn-hero-kicker'>{slide.kicker}</p>
-              <h1>{slide.title}</h1>
-              <p>{slide.text}</p>
+              {slide.showKicker !== false && slide.kicker ? <p className='vn-hero-kicker'>{slide.kicker}</p> : null}
+              {slide.showTitle !== false && slide.title ? <h1>{slide.title}</h1> : null}
+              {slide.showText !== false && slide.text ? <p>{slide.text}</p> : null}
               <div className='vn-hero-actions'>
-                <Link className='vn-btn vn-btn-solid vn-btn-light' href={slide.href}>
-                  {slide.cta}
-                </Link>
-                <Link className='vn-btn vn-btn-ghost' href='/video'>
-                  Shop on video
-                </Link>
+                {slide.showButton !== false && (slide.buttonLabel || slide.cta) ? (
+                  <Link className='vn-btn vn-btn-solid vn-btn-light' href={slide.href}>
+                    {slide.buttonLabel || slide.cta}
+                  </Link>
+                ) : null}
+                {slide.showSecondButton && slide.secondLabel ? (
+                  <Link className='vn-btn vn-btn-ghost' href={slide.secondHref || '/video'}>
+                    {slide.secondLabel}
+                  </Link>
+                ) : null}
               </div>
             </div>
           </article>

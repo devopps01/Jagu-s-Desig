@@ -1,6 +1,16 @@
 import { ObjectId } from 'mongodb'
 
-import { defaultContactSettings, type ContactSettings, type ContactStatus } from '@/libs/contact-types'
+import {
+  createContactFaq,
+  createContactHelpCard,
+  createContactTopic,
+  defaultContactSettings,
+  type ContactFaq,
+  type ContactHelpCard,
+  type ContactSettings,
+  type ContactStatus,
+  type ContactTopic
+} from '@/libs/contact-types'
 import { getDb } from '@/libs/mongo'
 import { searchRegex, tableResponse, type TableQuery } from '@/libs/table-query'
 
@@ -64,13 +74,68 @@ const mapSubmission = (doc: ContactSubmissionDoc) => ({
   updatedAt: doc.updatedAt
 })
 
+const cleanMultiline = (value: unknown, max: number) =>
+  String(value || '')
+    .replace(/\r\n/g, '\n')
+    .trim()
+    .slice(0, max)
+
+const normalizeHelpCards = (value: unknown): ContactHelpCard[] => {
+  if (!Array.isArray(value) || value.length === 0) return defaultContactSettings.helpCards
+
+  return value.map((row, index) =>
+    createContactHelpCard({
+      id: cleanText((row as ContactHelpCard)?.id, 40) || `help-${index}`,
+      enabled: (row as ContactHelpCard)?.enabled !== false,
+      icon: cleanText((row as ContactHelpCard)?.icon, 60) || 'tabler-message',
+      title: cleanText((row as ContactHelpCard)?.title, 80),
+      copy: cleanMultiline((row as ContactHelpCard)?.copy, 280)
+    })
+  )
+}
+
+const normalizeTopics = (value: unknown): ContactTopic[] => {
+  if (!Array.isArray(value) || value.length === 0) return defaultContactSettings.topics
+
+  return value.map((row, index) => {
+    const raw = row as ContactTopic & { points?: string | string[] }
+    const points = Array.isArray(raw.points) ? raw.points.join('\n') : raw.points
+
+    return createContactTopic({
+      id: cleanText(raw.id, 40) || `topic-${index}`,
+      enabled: raw.enabled !== false,
+      icon: cleanText(raw.icon, 60) || 'tabler-sparkles',
+      title: cleanText(raw.title, 80),
+      points: cleanMultiline(points, 1200)
+    })
+  })
+}
+
+const normalizeFaqs = (value: unknown): ContactFaq[] => {
+  if (!Array.isArray(value) || value.length === 0) return defaultContactSettings.faqs
+
+  return value.map((row, index) => {
+    const raw = row as ContactFaq & { q?: string; a?: string }
+
+    return createContactFaq({
+      id: cleanText(raw.id, 40) || `faq-${index}`,
+      enabled: raw.enabled !== false,
+      question: cleanText(raw.question || raw.q, 160),
+      answer: cleanMultiline(raw.answer || raw.a, 600)
+    })
+  })
+}
+
 const normalizeSettings = (input: Partial<ContactSettings> = {}): ContactSettings => ({
+  kicker: cleanText(input.kicker, 60) || defaultContactSettings.kicker,
   headline: cleanText(input.headline, 120) || defaultContactSettings.headline,
   intro: cleanText(input.intro, 400) || defaultContactSettings.intro,
   email: cleanText(input.email, 120),
   phone: cleanText(input.phone, 40) || defaultContactSettings.phone,
   whatsapp: cleanText(input.whatsapp, 20).replace(/\D/g, '') || defaultContactSettings.whatsapp,
   hours: cleanText(input.hours, 80) || defaultContactSettings.hours,
+  hoursTitle: cleanText(input.hoursTitle, 60) || defaultContactSettings.hoursTitle,
+  hoursNote: cleanText(input.hoursNote, 160) || defaultContactSettings.hoursNote,
   suratTitle: cleanText(input.suratTitle, 60) || defaultContactSettings.suratTitle,
   suratAddress: isStaleSuratAddress(cleanText(input.suratAddress, 280))
     ? defaultContactSettings.suratAddress
@@ -84,6 +149,30 @@ const normalizeSettings = (input: Partial<ContactSettings> = {}): ContactSetting
   bangaloreMapQuery: isRemovedBangalore(cleanText(input.bangaloreMapQuery, 200) || cleanText(input.bangaloreAddress, 200))
     ? ''
     : cleanText(input.bangaloreMapQuery, 200),
+  helpNote: cleanText(input.helpNote, 60) || defaultContactSettings.helpNote,
+  helpTitle: cleanText(input.helpTitle, 120) || defaultContactSettings.helpTitle,
+  helpCards: normalizeHelpCards(input.helpCards),
+  topicsNote: cleanText(input.topicsNote, 80) || defaultContactSettings.topicsNote,
+  topicsTitle: cleanText(input.topicsTitle, 120) || defaultContactSettings.topicsTitle,
+  topics: normalizeTopics(input.topics),
+  replyTitle: cleanText(input.replyTitle, 60) || defaultContactSettings.replyTitle,
+  replyText: cleanText(input.replyText, 280) || defaultContactSettings.replyText,
+  whatsappButtonLabel: cleanText(input.whatsappButtonLabel, 40) || defaultContactSettings.whatsappButtonLabel,
+  emailButtonLabel: cleanText(input.emailButtonLabel, 40) || defaultContactSettings.emailButtonLabel,
+  videoButtonLabel: cleanText(input.videoButtonLabel, 40) || defaultContactSettings.videoButtonLabel,
+  videoButtonHref: cleanText(input.videoButtonHref, 120) || defaultContactSettings.videoButtonHref,
+  formKicker: cleanText(input.formKicker, 60) || defaultContactSettings.formKicker,
+  formTitle: cleanText(input.formTitle, 80) || defaultContactSettings.formTitle,
+  formNote: cleanText(input.formNote, 160) || defaultContactSettings.formNote,
+  formSuccessTitle: cleanText(input.formSuccessTitle, 80) || defaultContactSettings.formSuccessTitle,
+  formSuccessText: cleanText(input.formSuccessText, 200) || defaultContactSettings.formSuccessText,
+  formSubmitLabel: cleanText(input.formSubmitLabel, 40) || defaultContactSettings.formSubmitLabel,
+  subjects: cleanMultiline(input.subjects, 400) || defaultContactSettings.subjects,
+  mapNote: cleanText(input.mapNote, 60) || defaultContactSettings.mapNote,
+  mapTitle: cleanText(input.mapTitle, 80) || defaultContactSettings.mapTitle,
+  faqNote: cleanText(input.faqNote, 60) || defaultContactSettings.faqNote,
+  faqTitle: cleanText(input.faqTitle, 80) || defaultContactSettings.faqTitle,
+  faqs: normalizeFaqs(input.faqs)
 })
 
 export const getContactSettings = async (): Promise<ContactSettings> => {

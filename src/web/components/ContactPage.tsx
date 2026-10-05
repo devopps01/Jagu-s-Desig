@@ -1,117 +1,70 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
-import { storeTelHref, storeWhatsAppHref, type ContactSettings } from '@/libs/contact-types'
-
-const subjects = [
-  'Custom order',
-  'Rental inquiry',
-  'Store visit',
-  'Styling help',
-  'Quality issue',
-  'Return & exchange',
-  'Order support',
-  'Wholesale',
-  'Other'
-]
+import {
+  paragraphsToList,
+  storeTelHref,
+  storeWhatsAppHref,
+  type ContactSettings
+} from '@/libs/contact-types'
 
 const emptyForm = {
   name: '',
   email: '',
   phone: '',
-  subject: subjects[0],
+  subject: '',
   message: '',
   website: ''
 }
-
-const helpCards = [
-  { icon: 'tabler-brand-whatsapp', title: 'WhatsApp styling', copy: 'Share a photo or occasion. We reply with pieces, sizes and timelines.' },
-  { icon: 'tabler-video', title: 'Video shopping', copy: 'Book a private call to see embroidery, colour and drape before you buy or rent.' },
-  { icon: 'tabler-building-store', title: 'Store visit', copy: 'Visit the Surat atelier. Try a chaniya choli and leave with a confirmed fit.' },
-  { icon: 'tabler-needle', title: 'Custom & rental', copy: 'Ask for a made-to-measure piece, a Navratri rental, or a sister referral offer.' }
-]
-
-const topics = [
-  {
-    icon: 'tabler-sparkles',
-    title: 'Quality you can feel',
-    points: [
-      'Every chaniya choli is checked for stitch, lining, zip and embroidery before dispatch.',
-      'Mirror, thread and sequin work is packed so it travels without crush.',
-      'If a piece arrives damaged, we exchange it. Send photos on WhatsApp.',
-      'Hand work varies slightly from piece to piece — that is the craft, not a fault.'
-    ]
-  },
-  {
-    icon: 'tabler-shield-lock',
-    title: 'Secure shopping',
-    points: [
-      'Website login uses a one-time email OTP. We never ask for your password.',
-      'Orders and addresses stay on your account. We do not sell customer data.',
-      'Pay online or choose cash on delivery. Card details never pass through our staff chat.',
-      'Write only on this form, WhatsApp or the listed phones so you reach the real atelier.'
-    ]
-  },
-  {
-    icon: 'tabler-headset',
-    title: 'Support that stays with you',
-    points: [
-      'Most inquiries get a first reply the same working day.',
-      'We help with size, colour matching, rental dates and store appointments.',
-      'Dispatch is usually 2–4 working days after confirmation, with tracking on WhatsApp.',
-      'Easy exchange if the fit or quality is not right. Keep tags and packing till you decide.'
-    ]
-  }
-]
-
-const faqs = [
-  {
-    q: 'How soon will someone reply?',
-    a: 'On working days we aim to reply within a few hours on WhatsApp or email. After 8:00 PM or on Sunday, the first reply usually comes the next morning.'
-  },
-  {
-    q: 'Can I visit without an appointment?',
-    a: 'Yes during atelier hours. For a custom trial or a busy Navratri week, message us first so a stylist and the pieces you want are ready.'
-  },
-  {
-    q: 'How do rentals work?',
-    a: 'Tell us the occasion dates and your size. We hold the piece once the booking is confirmed, share pickup or courier details, and check the garment when it returns.'
-  },
-  {
-    q: 'What if the embroidery or fit is not right?',
-    a: 'Photograph the issue in good light and write to us. Quality faults are exchanged. For fit, we guide an alteration or a swap while tags and packing are still with you.'
-  },
-  {
-    q: 'Is my payment and personal data safe?',
-    a: 'Yes. Login is OTP-only, checkout uses trusted payment rails or COD, and we keep addresses for your orders only. We will never ask you to share an OTP with a caller.'
-  },
-  {
-    q: 'Do you ship outside India?',
-    a: 'Yes, worldwide shipping is available on request. Duties and extra transit time depend on the destination. We share a tracking link once the parcel leaves Surat.'
-  },
-  {
-    q: 'Can you make a custom size or colour?',
-    a: 'Yes. Send your measurements, a reference photo and the occasion date. We confirm fabric, embroidery and a timeline before work begins.'
-  },
-  {
-    q: 'How do I track an order?',
-    a: 'Use Track Order in the footer, or message us your order ID. We also send dispatch updates on WhatsApp when the courier is assigned.'
-  }
-]
 
 const mapSrc = (query: string) =>
   `https://maps.google.com/maps?q=${encodeURIComponent(query)}&z=15&hl=en&output=embed`
 
 const directionsHref = (query: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
 
-const ContactPage = ({ settings }: { settings: ContactSettings }) => {
-  const [form, setForm] = useState(emptyForm)
+const ContactPage = ({ settings: initialSettings }: { settings: ContactSettings }) => {
+  const [settings, setSettings] = useState(initialSettings)
+  const subjects = useMemo(() => paragraphsToList(settings.subjects), [settings.subjects])
+  const [form, setForm] = useState({ ...emptyForm, subject: subjects[0] || 'Other' })
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
   const [loading, setLoading] = useState(false)
   const [place, setPlace] = useState<'surat' | 'bangalore'>('surat')
   const [openFaq, setOpenFaq] = useState(0)
+
+  useEffect(() => {
+    setSettings(initialSettings)
+  }, [initialSettings])
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return
+      if (event.data?.type === 'jagu-contact-draft' && event.data.settings) {
+        setSettings(event.data.settings)
+      }
+      if (event.data?.type === 'jagu-contact-ready-ping') {
+        window.parent.postMessage({ type: 'jagu-contact-ready' }, window.location.origin)
+      }
+      if (event.data?.type === 'jagu-contact-scroll' && event.data.id) {
+        const target = document.getElementById(`contact-${event.data.id}`)
+        target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }
+
+    window.addEventListener('message', onMessage)
+
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: 'jagu-contact-ready' }, window.location.origin)
+    }
+
+    return () => window.removeEventListener('message', onMessage)
+  }, [])
+
+  useEffect(() => {
+    if (!subjects.length) return
+    setForm(current => (subjects.includes(current.subject) ? current : { ...current, subject: subjects[0] }))
+  }, [subjects])
 
   const whatsappHref = useMemo(
     () => storeWhatsAppHref('Hello Jagu’s Designing, I would like to enquire.', settings.whatsapp),
@@ -126,6 +79,10 @@ const ContactPage = ({ settings }: { settings: ContactSettings }) => {
   const activeQuery = activePlace === 'bangalore' ? bangaloreQuery : suratQuery
   const activeTitle = activePlace === 'bangalore' ? settings.bangaloreTitle : settings.suratTitle
   const activeAddress = activePlace === 'bangalore' ? settings.bangaloreAddress : settings.suratAddress
+
+  const helpCards = settings.helpCards.filter(card => card.enabled !== false)
+  const topics = settings.topics.filter(topic => topic.enabled !== false)
+  const faqs = settings.faqs.filter(faq => faq.enabled !== false)
 
   const submit = async () => {
     setLoading(true)
@@ -142,31 +99,30 @@ const ContactPage = ({ settings }: { settings: ContactSettings }) => {
 
     if (!res.ok) {
       setError(data.message || 'Could not send message')
-
       return
     }
 
     setDone(true)
-    setForm(emptyForm)
+    setForm({ ...emptyForm, subject: subjects[0] || 'Other' })
   }
 
   return (
     <section className='vn-section vn-contact'>
-      <div className='vn-page-hero'>
-        <p className='vn-hero-kicker'>Contact & support</p>
+      <div id='contact-copy' className='vn-page-hero'>
+        {settings.kicker ? <p className='vn-hero-kicker'>{settings.kicker}</p> : null}
         <h1>{settings.headline}</h1>
         <div className='vn-rule' />
-        <p>{settings.intro}</p>
+        {settings.intro ? <p>{settings.intro}</p> : null}
       </div>
 
-      <div className='vn-contact-block vn-contact-block-top'>
+      <div id='contact-help' className='vn-contact-block vn-contact-block-top'>
         <div className='vn-section-head'>
-          <p className='vn-section-note'>How we help</p>
-          <h2>Proper support, from first message to dispatch</h2>
+          {settings.helpNote ? <p className='vn-section-note'>{settings.helpNote}</p> : null}
+          {settings.helpTitle ? <h2>{settings.helpTitle}</h2> : null}
         </div>
         <div className='vn-contact-help'>
           {helpCards.map(card => (
-            <article key={card.title}>
+            <article key={card.id}>
               <i className={card.icon} />
               <h3>{card.title}</h3>
               <p>{card.copy}</p>
@@ -175,31 +131,37 @@ const ContactPage = ({ settings }: { settings: ContactSettings }) => {
         </div>
       </div>
 
-      <div className='vn-contact-block'>
+      <div id='contact-topics' className='vn-contact-block'>
         <div className='vn-section-head'>
-          <p className='vn-section-note'>Quality · Security · Care</p>
-          <h2>What you can expect from Jagu’s Designing</h2>
+          {settings.topicsNote ? <p className='vn-section-note'>{settings.topicsNote}</p> : null}
+          {settings.topicsTitle ? <h2>{settings.topicsTitle}</h2> : null}
         </div>
         <div className='vn-contact-topics'>
-          {topics.map(topic => (
-            <article key={topic.title}>
-              <h3>
-                <i className={topic.icon} />
-                {topic.title}
-              </h3>
-              <ul>
-                {topic.points.map(point => (
-                  <li key={point}>{point}</li>
-                ))}
-              </ul>
-            </article>
-          ))}
+          {topics.map(topic => {
+            const points = paragraphsToList(topic.points)
+
+            return (
+              <article key={topic.id}>
+                <h3>
+                  <i className={topic.icon} />
+                  {topic.title}
+                </h3>
+                {points.length ? (
+                  <ul>
+                    {points.map(point => (
+                      <li key={point}>{point}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </article>
+            )
+          })}
         </div>
       </div>
 
       <div className='vn-contact-grid'>
-        <aside className='vn-contact-aside'>
-          <article className='vn-contact-card'>
+        <aside id='contact-reach' className='vn-contact-aside'>
+          <article id='contact-surat' className='vn-contact-card'>
             <i className='tabler-building-store' />
             <div>
               <h3>{settings.suratTitle}</h3>
@@ -213,7 +175,7 @@ const ContactPage = ({ settings }: { settings: ContactSettings }) => {
             </div>
           </article>
           {hasBangalore ? (
-            <article className='vn-contact-card'>
+            <article id='contact-bangalore' className='vn-contact-card'>
               <i className='tabler-map-pin' />
               <div>
                 <h3>{settings.bangaloreTitle}</h3>
@@ -221,47 +183,51 @@ const ContactPage = ({ settings }: { settings: ContactSettings }) => {
                 {settings.bangalorePhone ? <a href={`tel:${settings.bangalorePhone.replace(/[^\d+]/g, '')}`}>{settings.bangalorePhone}</a> : null}
               </div>
             </article>
-          ) : null}
+          ) : (
+            <div id='contact-bangalore' hidden aria-hidden />
+          )}
           <article className='vn-contact-card'>
             <i className='tabler-clock' />
             <div>
-              <h3>Atelier hours</h3>
+              <h3>{settings.hoursTitle}</h3>
               <p>{settings.hours}</p>
-              <p>Sunday by appointment for trials and pickups.</p>
+              {settings.hoursNote ? <p>{settings.hoursNote}</p> : null}
             </div>
           </article>
           <article className='vn-contact-card'>
             <i className='tabler-message-2' />
             <div>
-              <h3>How we reply</h3>
-              <p>WhatsApp and this form are checked through the day. Share your occasion date, city and size so we can help in one reply.</p>
+              <h3>{settings.replyTitle}</h3>
+              <p>{settings.replyText}</p>
             </div>
           </article>
           <div className='vn-contact-actions'>
-            {whatsappHref ? (
+            {whatsappHref && settings.whatsappButtonLabel ? (
               <a className='vn-btn vn-btn-solid' href={whatsappHref} target='_blank' rel='noreferrer'>
-                WhatsApp the atelier
+                {settings.whatsappButtonLabel}
               </a>
             ) : null}
-            {mailHref ? (
+            {mailHref && settings.emailButtonLabel ? (
               <a className='vn-btn vn-btn-outline' href={mailHref}>
-                Email us
+                {settings.emailButtonLabel}
               </a>
             ) : null}
-            <a className='vn-btn vn-btn-outline' href='/video'>
-              Video shopping
-            </a>
+            {settings.videoButtonLabel ? (
+              <a className='vn-btn vn-btn-outline' href={settings.videoButtonHref || '/video'}>
+                {settings.videoButtonLabel}
+              </a>
+            ) : null}
           </div>
         </aside>
 
-        <div className='vn-contact-panel'>
-          <p className='vn-hero-kicker'>Write to us</p>
-          <h2 className='vn-contact-panel-title'>Tell us what you need</h2>
+        <div id='contact-form' className='vn-contact-panel'>
+          {settings.formKicker ? <p className='vn-hero-kicker'>{settings.formKicker}</p> : null}
+          <h2 className='vn-contact-panel-title'>{settings.formTitle}</h2>
           {done ? (
             <div className='vn-contact-ok'>
               <i className='tabler-checks' />
-              <h3>Message received</h3>
-              <p>Thank you. Our team will reply on email or WhatsApp shortly.</p>
+              <h3>{settings.formSuccessTitle}</h3>
+              <p>{settings.formSuccessText}</p>
               <button className='vn-btn vn-btn-outline' type='button' onClick={() => setDone(false)}>
                 Send another message
               </button>
@@ -306,10 +272,7 @@ const ContactPage = ({ settings }: { settings: ContactSettings }) => {
                 </label>
                 <label className='vn-field'>
                   <span>Topic</span>
-                  <select
-                    value={form.subject}
-                    onChange={event => setForm(current => ({ ...current, subject: event.target.value }))}
-                  >
+                  <select value={form.subject} onChange={event => setForm(current => ({ ...current, subject: event.target.value }))}>
                     {subjects.map(item => (
                       <option key={item} value={item}>
                         {item}
@@ -337,18 +300,18 @@ const ContactPage = ({ settings }: { settings: ContactSettings }) => {
               />
               {error ? <p className='vn-contact-error'>{error}</p> : null}
               <button className='vn-btn vn-btn-solid' type='submit' disabled={loading}>
-                {loading ? 'Sending…' : 'Send message'}
+                {loading ? 'Sending…' : settings.formSubmitLabel}
               </button>
-              <p className='vn-contact-note'>We never share this form with anyone outside the atelier.</p>
+              {settings.formNote ? <p className='vn-contact-note'>{settings.formNote}</p> : null}
             </form>
           )}
         </div>
       </div>
 
-      <div className='vn-contact-block'>
+      <div id='contact-map' className='vn-contact-block'>
         <div className='vn-section-head'>
-          <p className='vn-section-note'>Visit us</p>
-          <h2>Live map & directions</h2>
+          {settings.mapNote ? <p className='vn-section-note'>{settings.mapNote}</p> : null}
+          {settings.mapTitle ? <h2>{settings.mapTitle}</h2> : null}
         </div>
         {hasBangalore ? (
           <div className='vn-contact-map-tabs' role='tablist' aria-label='Store locations'>
@@ -379,22 +342,22 @@ const ContactPage = ({ settings }: { settings: ContactSettings }) => {
         </div>
       </div>
 
-      <div className='vn-contact-block vn-contact-faq-wrap'>
+      <div id='contact-faq' className='vn-contact-block vn-contact-faq-wrap'>
         <div className='vn-section-head'>
-          <p className='vn-section-note'>Questions</p>
-          <h2>Before you write</h2>
+          {settings.faqNote ? <p className='vn-section-note'>{settings.faqNote}</p> : null}
+          {settings.faqTitle ? <h2>{settings.faqTitle}</h2> : null}
         </div>
         <div className='vn-contact-faq'>
           {faqs.map((item, index) => {
             const open = openFaq === index
 
             return (
-              <article key={item.q} className={open ? 'is-open' : ''}>
+              <article key={item.id} className={open ? 'is-open' : ''}>
                 <button type='button' aria-expanded={open} onClick={() => setOpenFaq(open ? -1 : index)}>
-                  <span>{item.q}</span>
+                  <span>{item.question}</span>
                   <i className={open ? 'tabler-minus' : 'tabler-plus'} />
                 </button>
-                {open ? <p>{item.a}</p> : null}
+                {open ? <p>{item.answer}</p> : null}
               </article>
             )
           })}

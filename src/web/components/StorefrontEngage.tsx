@@ -7,7 +7,6 @@ import LoginForm from '@web/components/LoginForm'
 import { useLoginModal } from '@web/context/LoginModalContext'
 import { registerWebPush, requestWebPush } from '@web/lib/firebase-client'
 
-const LOGIN_SHOWN = 'jagu-login-shown'
 const LAST_PATH = 'jagu-last-path'
 const PAGE_VIEWS = 'jagu-page-views'
 const OFFER_DONE = 'jagu-offer-dismissed'
@@ -17,7 +16,7 @@ type FeaturedOffer = { code: string; label: string; note: string }
 
 const StorefrontEngage = () => {
   const pathname = usePathname()
-  const { user, ready, isOpen, openLogin, closeLogin, refreshUser } = useLoginModal()
+  const { user, ready, isOpen, closeLogin, refreshUser } = useLoginModal()
   const [offerOpen, setOfferOpen] = useState(false)
   const [pushOpen, setPushOpen] = useState(false)
   const [pushBusy, setPushBusy] = useState(false)
@@ -44,14 +43,6 @@ const StorefrontEngage = () => {
       setPushOpen(false)
     }
   }, [closeLogin, pathname])
-
-  useEffect(() => {
-    if (!ready || user || pathname === '/login' || pathname === '/checkout') return
-    if (window.sessionStorage.getItem(LOGIN_SHOWN) === '1') return
-
-    window.sessionStorage.setItem(LOGIN_SHOWN, '1')
-    queueMicrotask(() => openLogin())
-  }, [openLogin, pathname, ready, user])
 
   useEffect(() => {
     if (!ready || user || pathname === '/login' || pathname === '/checkout') return
