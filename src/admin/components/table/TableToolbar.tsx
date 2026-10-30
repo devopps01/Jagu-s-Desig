@@ -17,6 +17,7 @@ type TableToolbarProps = {
   onSearchChange: (value: string) => void
   onRefresh?: () => void
   actions?: ReactNode
+  hideSearch?: boolean
 }
 
 const TableToolbar = ({
@@ -26,12 +27,16 @@ const TableToolbar = ({
   searchPlaceholder = 'Search...',
   onSearchChange,
   onRefresh,
-  actions
+  actions,
+  hideSearch = false
 }: TableToolbarProps) => (
   <CardHeader
     sx={{
       gap: 4,
       flexWrap: 'wrap',
+      px: { xs: 3, sm: 4 },
+      pt: { xs: 4, sm: 5 },
+      pb: 2,
       '& .MuiCardHeader-action': { margin: 0, width: { xs: '100%', md: 'auto' } }
     }}
     title={
@@ -45,22 +50,25 @@ const TableToolbar = ({
       </Box>
     }
     action={
-      <Box className='flex flex-wrap items-center gap-3' sx={{ m: 0 }}>
-        <TextField
-          size='small'
-          value={search}
-          placeholder={searchPlaceholder}
-          onChange={event => onSearchChange(event.target.value)}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position='start'>
-                  <i className='tabler-search' />
-                </InputAdornment>
-              )
-            }
-          }}
-        />
+      <Box className='flex flex-wrap items-center gap-3' sx={{ m: 0, width: { xs: '100%', md: 'auto' } }}>
+        {hideSearch ? null : (
+          <TextField
+            size='small'
+            value={search}
+            placeholder={searchPlaceholder}
+            onChange={event => onSearchChange(event.target.value)}
+            sx={{ minWidth: { xs: '100%', sm: 220 } }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position='start'>
+                    <i className='tabler-search' />
+                  </InputAdornment>
+                )
+              }
+            }}
+          />
+        )}
         {actions}
         {onRefresh ? (
           <Button variant='tonal' color='secondary' startIcon={<i className='tabler-refresh' />} onClick={onRefresh}>

@@ -14,6 +14,8 @@ import Typography from '@mui/material/Typography'
 import type { ApexOptions } from 'apexcharts'
 
 import { AdminDataTable, useServerTable } from '@admin/components/table'
+import { useConfirmDelete } from '@admin/hooks/useConfirmDelete'
+import { adminApi, adminMutate } from '@admin/libs/adminApi'
 import type { ReviewStatus } from '@/libs/reviews'
 
 const AppReactApexCharts = dynamic(() => import('@/libs/styles/AppReactApexCharts'))
@@ -64,16 +66,16 @@ const statusColor = (status: ReviewStatus) => {
 }
 
 const ReviewManager = () => {
+  const { askDelete, confirmDialog } = useConfirmDelete()
   const [statusFilter, setStatusFilter] = useState('')
   const extraParams = useMemo(() => ({ status: statusFilter }), [statusFilter])
   const table = useServerTable<ReviewRow>('/api/admin/reviews', { extraParams })
   const [stats, setStats] = useState<Stats>(emptyStats)
 
   const loadStats = async () => {
-    const res = await fetch('/api/admin/reviews/stats')
-    const json = await res.json()
+    const result = await adminApi<Stats>('/api/admin/reviews/stats', undefined, { silentSuccess: true })
 
-    if (res.ok) setStats(json)
+    if (result.ok) setStats(result.data)
   }
 
   useEffect(() => {
@@ -81,11 +83,15 @@ const ReviewManager = () => {
   }, [table.rows])
 
   const patch = async (id: string, status: ReviewStatus) => {
-    await fetch(`/api/admin/reviews/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status })
-    })
+    await adminMutate(
+      `/api/admin/reviews/${id}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      },
+      { successMessage: 'Review updated' }
+    )
     await table.reload()
     await loadStats()
   }
@@ -277,7 +283,25 @@ const ReviewManager = () => {
                       <i className='tabler-eye-off' />
                     </IconButton>
                   )}
-                  <IconButton size='small' title='Delete' onClick={() => void fetch(`/api/admin/reviews/${row.id}`, { method: 'DELETE' }).then(() => table.reload())}>
+                  <IconButton
+                    size='small'
+                    title='Delete'
+                    onClick={() =>
+                      askDelete({
+                        name: row.productTitle,
+                        onConfirm: () =>
+                          adminMutate(
+                            `/api/admin/reviews/${row.id}`,
+                            { method: 'DELETE' },
+                            { successMessage: 'Review deleted' },
+                            async () => {
+                              await table.reload()
+                              await loadStats()
+                            }
+                          )
+                      })
+                    }
+                  >
                     <i className='tabler-trash' />
                   </IconButton>
                 </>
@@ -295,6 +319,7 @@ const ReviewManager = () => {
           onLimitChange={table.setLimit}
         />
       </Grid>
+      {confirmDialog}
     </Grid>
   )
 }

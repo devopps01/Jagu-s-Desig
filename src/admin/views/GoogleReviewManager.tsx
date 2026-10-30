@@ -11,6 +11,7 @@ import Switch from '@mui/material/Switch'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 
+import { adminApi } from '@admin/libs/adminApi'
 import { defaultGoogleReviewSettings, type GoogleReviewSettings } from '@/libs/google-reviews-types'
 
 type AdminState = GoogleReviewSettings & {
@@ -41,10 +42,9 @@ const GoogleReviewManager = () => {
   const [message, setMessage] = useState('')
 
   const load = async () => {
-    const res = await fetch('/api/admin/google-reviews')
-    const json = await res.json()
+    const result = await adminApi<AdminState>('/api/admin/google-reviews', undefined, { silentSuccess: true })
 
-    if (res.ok) setForm({ ...empty, ...json })
+    if (result.ok) setForm({ ...empty, ...result.data })
   }
 
   useEffect(() => {
@@ -55,32 +55,38 @@ const GoogleReviewManager = () => {
     setSaving(true)
     setMessage('')
 
-    const res = await fetch('/api/admin/google-reviews', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form)
-    })
-    const json = await res.json()
+    const result = await adminApi<AdminState>(
+      '/api/admin/google-reviews',
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form)
+      },
+      { successMessage: 'Google review settings saved' }
+    )
 
     setSaving(false)
-    setMessage(res.ok ? 'Google review settings saved.' : json.message || 'Save failed')
-    if (res.ok) setForm({ ...empty, ...json })
+    setMessage(result.ok ? 'Google review settings saved.' : result.message || 'Save failed')
+    if (result.ok) setForm({ ...empty, ...result.data })
   }
 
   const fetchGoogle = async () => {
     setFetching(true)
     setMessage('')
 
-    const res = await fetch('/api/admin/google-reviews', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form)
-    })
-    const json = await res.json()
+    const result = await adminApi<AdminState>(
+      '/api/admin/google-reviews',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form)
+      },
+      { successMessage: 'Reviews fetched from Google' }
+    )
 
     setFetching(false)
-    setMessage(res.ok ? 'Reviews fetched from Google.' : json.message || 'Fetch failed')
-    if (res.ok) setForm({ ...empty, ...json })
+    setMessage(result.ok ? 'Reviews fetched from Google.' : result.message || 'Fetch failed')
+    if (result.ok) setForm({ ...empty, ...result.data })
   }
 
   return (

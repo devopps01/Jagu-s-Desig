@@ -10,6 +10,8 @@ import Switch from '@mui/material/Switch'
 import TextField from '@mui/material/TextField'
 
 import { AdminDataTable, useServerTable } from '@admin/components/table'
+import { useConfirmDelete } from '@admin/hooks/useConfirmDelete'
+import { adminApi, adminMutate } from '@admin/libs/adminApi'
 import ProductFormModal, { type ProductFormValue } from '@admin/views/ProductFormModal'
 import MediaPickerModal, { type PickedMedia } from '@admin/views/MediaPickerModal'
 import { discountPercent, formatPrice } from '@web/data/catalog'
@@ -39,6 +41,8 @@ const emptyForm: ProductFormValue = {
   style: 'Chaniya Choli',
   styles: ['Chaniya Choli'],
   sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size'],
+  rentSizeStock: { XS: 1, S: 1, M: 1, L: 1, XL: 1, XXL: 1, 'Free Size': 1 },
+  saleSizeStock: {},
   details: [
     { label: 'Country of manufacture', value: 'India' },
     { label: 'Wash care', value: 'Dry wash only' },
@@ -54,6 +58,7 @@ const emptyForm: ProductFormValue = {
 }
 
 const ProductManager = () => {
+  const { askDelete, confirmDialog } = useConfirmDelete()
   const [statusFilter, setStatusFilter] = useState('')
   const [listingFilter, setListingFilter] = useState('')
   const extraParams = useMemo(() => ({ status: statusFilter, listingType: listingFilter }), [listingFilter, statusFilter])
@@ -82,15 +87,14 @@ const ProductManager = () => {
       sellingMrp: Number(form.sellingMrp) || 0,
       rentMrp: Number(form.rentMrp) || 0
     }
-    const res = await fetch(form.id ? `/api/admin/products/${form.id}` : '/api/admin/products', {
+    const result = await adminApi(form.id ? `/api/admin/products/${form.id}` : '/api/admin/products', {
       method: form.id ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
-    })
-    const json = await res.json()
+    }, { successMessage: form.id ? 'Product updated' : 'Product saved' })
 
-    if (!res.ok) {
-      setError(json.message || 'Save failed')
+    if (!result.ok) {
+      setError(result.message || 'Save failed')
 
       return
     }
@@ -142,6 +146,7 @@ const ProductManager = () => {
             render: row =>
               row.imageUrl ? <img src={row.imageUrl} alt={row.imageAlt} width={48} height={64} style={{ objectFit: 'cover', borderRadius: 6 }} /> : '-'
           },
+          { id: 'productNo', label: 'No.', render: row => (row.productNo ? `#${row.productNo}` : '-') },
           { id: 'name', label: 'Name' },
           {
             id: 'listingType',
@@ -190,11 +195,16 @@ const ProductManager = () => {
                 size='small'
                 checked={Boolean(row.isTrending)}
                 onChange={() =>
-                  void fetch(`/api/admin/products/${row.id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ isTrending: !row.isTrending })
-                  }).then(() => table.reload())
+                  void adminMutate(
+                    `/api/admin/products/${row.id}`,
+                    {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ isTrending: !row.isTrending })
+                    },
+                    { successMessage: row.isTrending ? 'Removed from Trending' : 'Marked as Trending' },
+                    () => table.reload()
+                  )
                 }
               />
             )
@@ -207,11 +217,16 @@ const ProductManager = () => {
                 size='small'
                 checked={Boolean(row.isBestSeller)}
                 onChange={() =>
-                  void fetch(`/api/admin/products/${row.id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ isBestSeller: !row.isBestSeller })
-                  }).then(() => table.reload())
+                  void adminMutate(
+                    `/api/admin/products/${row.id}`,
+                    {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ isBestSeller: !row.isBestSeller })
+                    },
+                    { successMessage: row.isBestSeller ? 'Removed from Most Selling' : 'Marked as Most Selling' },
+                    () => table.reload()
+                  )
                 }
               />
             )
@@ -224,11 +239,16 @@ const ProductManager = () => {
                 size='small'
                 checked={row.status === 'active'}
                 onChange={() =>
-                  void fetch(`/api/admin/products/${row.id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: row.status === 'active' ? 'inactive' : 'active' })
-                  }).then(() => table.reload())
+                  void adminMutate(
+                    `/api/admin/products/${row.id}`,
+                    {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ status: row.status === 'active' ? 'inactive' : 'active' })
+                    },
+                    { successMessage: row.status === 'active' ? 'Product deactivated' : 'Product activated' },
+                    () => table.reload()
+                  )
                 }
               />
             )
@@ -269,7 +289,18 @@ const ProductManager = () => {
                 <IconButton
                   size='small'
                   color='error'
-                  onClick={() => void fetch(`/api/admin/products/${row.id}`, { method: 'DELETE' }).then(() => table.reload())}
+                  onClick={() =>
+                    askDelete({
+                      name: row.name,
+                      onConfirm: () =>
+                        adminMutate(
+                          `/api/admin/products/${row.id}`,
+                          { method: 'DELETE' },
+                          { successMessage: 'Product deleted' },
+                          () => table.reload()
+                        )
+                    })
+                  }
                 >
                   <i className='tabler-trash' />
                 </IconButton>
@@ -332,6 +363,7 @@ const ProductManager = () => {
           })
         }
       />
+      {confirmDialog}
     </>
   )
 }

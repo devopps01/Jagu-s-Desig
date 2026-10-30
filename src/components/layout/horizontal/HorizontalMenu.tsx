@@ -83,15 +83,21 @@ const HorizontalMenu = ({ dictionary: _dictionary }: { dictionary: Awaited<Retur
           menuSectionStyles: verticalMenuSectionStyles(verticalNavOptions, theme)
         }}
       >
-        {STORE_MENU_GROUPS.map(group => (
-          <SubMenu key={group.label} label={group.label} icon={<i className={group.icon} />}>
-            {group.items.map(item => (
-              <MenuItem key={item.href} href={`/${locale}${item.href}`}>
-                {item.label}
-              </MenuItem>
-            ))}
-          </SubMenu>
-        ))}
+        {STORE_MENU_GROUPS.map(group =>
+          group.href ? (
+            <MenuItem key={group.href} href={`/${locale}${group.href}`} icon={<i className={group.icon} />}>
+              {group.label}
+            </MenuItem>
+          ) : (
+            <SubMenu key={group.label} label={group.label} icon={<i className={group.icon} />}>
+              {group.items.map(item => (
+                <MenuItem key={item.href} href={`/${locale}${item.href}`}>
+                  {item.label}
+                </MenuItem>
+              ))}
+            </SubMenu>
+          )
+        )}
       </Menu>
     </HorizontalNav>
   )

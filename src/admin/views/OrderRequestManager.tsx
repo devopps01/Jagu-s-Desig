@@ -17,6 +17,7 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 
 import { AdminDataTable, useServerTable } from '@admin/components/table'
+import { adminApi, adminMutate } from '@admin/libs/adminApi'
 import { formatPrice } from '@web/data/catalog'
 import { cancelReasons, returnReasons, type OrderRequestStatus, type OrderRequestType } from '@/libs/order-request-types'
 
@@ -56,10 +57,9 @@ const OrderRequestManager = () => {
   const [adminNote, setAdminNote] = useState('')
 
   const loadCounts = async () => {
-    const res = await fetch('/api/admin/order-requests?counts=1')
-    const json = await res.json()
+    const result = await adminApi<typeof counts>('/api/admin/order-requests?counts=1', undefined, { silentSuccess: true })
 
-    if (res.ok) setCounts(json)
+    if (result.ok) setCounts(result.data)
   }
 
   useEffect(() => {
@@ -67,11 +67,15 @@ const OrderRequestManager = () => {
   }, [table.rows])
 
   const patch = async (id: string, status: OrderRequestStatus) => {
-    await fetch(`/api/admin/order-requests/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, adminNote })
-    })
+    await adminMutate(
+      `/api/admin/order-requests/${id}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, adminNote })
+      },
+      { successMessage: 'Request updated' }
+    )
     setOpen(null)
     await table.reload()
     await loadCounts()

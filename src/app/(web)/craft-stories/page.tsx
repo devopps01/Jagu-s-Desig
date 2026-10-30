@@ -1,5 +1,7 @@
-import CollectionPage from '@web/components/CollectionPage'
+import { redirect } from 'next/navigation'
 
-const Page = () => <CollectionPage slug='all' title='Craft Stories' />
+const Page = () => {
+  redirect('/blog')
+}
 
 export default Page

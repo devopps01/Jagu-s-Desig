@@ -4,7 +4,6 @@ import { applyDiscountCode } from '@/libs/discounts'
 import { gstForTaxable } from '@/libs/gst'
 import { createWebOrder } from '@/libs/orders'
 import { getActivePaymentMethod } from '@/libs/payment-methods'
-import { applyReferralSister } from '@/libs/referral-sisters'
 import { getWebSession } from '@/libs/web-auth'
 
 export async function POST(req: Request) {
@@ -15,10 +14,6 @@ export async function POST(req: Request) {
     const subtotal = Number(body.subtotal) || 0
     let discountAmount = 0
     let discountCode = ''
-    let sisterId = ''
-    let sisterName = ''
-    let sisterCode = ''
-    let sisterDiscountAmount = 0
 
     if (body.discountCode) {
       const discount = await applyDiscountCode(String(body.discountCode), subtotal)
@@ -29,19 +24,8 @@ export async function POST(req: Request) {
       discountCode = discount.code
     }
 
-    if (body.sisterId || body.sisterCode) {
-      const sister = await applyReferralSister(String(body.sisterId || body.sisterCode), Math.max(0, subtotal - discountAmount))
-
-      if (!sister.ok) return NextResponse.json({ message: sister.message }, { status: 400 })
-
-      sisterId = sister.id
-      sisterName = sister.name
-      sisterCode = sister.code
-      sisterDiscountAmount = sister.amount
-    }
-
     const shipping = 0
-    const taxable = Math.max(0, subtotal - discountAmount - sisterDiscountAmount)
+    const taxable = Math.max(0, subtotal - discountAmount)
     const gst = await gstForTaxable(taxable)
     const total = Math.max(0, taxable + shipping + gst.amount)
     const method = body.paymentMethodId ? await getActivePaymentMethod(String(body.paymentMethodId)) : null
@@ -61,10 +45,6 @@ export async function POST(req: Request) {
       productSavings: Number(body.productSavings) || 0,
       discountCode,
       discountAmount,
-      sisterId,
-      sisterName,
-      sisterCode,
-      sisterDiscountAmount,
       gstEnabled: gst.enabled,
       gstRate: gst.rate,
       gstAmount: gst.amount,

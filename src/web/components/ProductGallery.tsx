@@ -22,7 +22,6 @@ const ProductGallery = ({ product }: { product: StoreProduct }) => {
   const zoomRef = useRef(ZOOM_MIN)
   const panRef = useRef({ x: 0, y: 0 })
   const scaleRef = useRef(1)
-  const hoverZoom = useRef(false)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const current = views[index] || views[0]
 
@@ -171,21 +170,15 @@ const ProductGallery = ({ product }: { product: StoreProduct }) => {
   }
 
   const onStageMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (zoom <= ZOOM_MIN) return
     if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return
     if ((event.target as HTMLElement).closest('button')) return
-
-    const activeZoom = zoom > ZOOM_MIN ? zoom : 2
-
-    if (zoom <= ZOOM_MIN) {
-      hoverZoom.current = true
-      setZoom(2)
-    }
 
     const box = stageRef.current?.getBoundingClientRect()
 
     if (!box) return
 
-    const scale = current.scale * activeZoom
+    const scale = current.scale * zoom
     const px = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width))
     const py = Math.min(1, Math.max(0, (event.clientY - box.top) / box.height))
     const maxX = (box.width * (scale - 1)) / 2
@@ -194,15 +187,6 @@ const ProductGallery = ({ product }: { product: StoreProduct }) => {
 
     panRef.current = next
     setPan(next)
-  }
-
-  const onStageLeave = () => {
-    if (!hoverZoom.current) return
-
-    hoverZoom.current = false
-    setZoom(ZOOM_MIN)
-    setPan({ x: 0, y: 0 })
-    setOrigin('50% 50%')
   }
 
   const imageScale = current.scale * zoom
@@ -228,7 +212,6 @@ const ProductGallery = ({ product }: { product: StoreProduct }) => {
           ref={stageRef}
           className={`vn-card-media vn-gallery-stage${zoom > ZOOM_MIN ? ' is-zoomed' : ''}`}
           onMouseMove={onStageMove}
-          onMouseLeave={onStageLeave}
           onDoubleClick={() => setZoomClamped(zoom > ZOOM_MIN ? ZOOM_MIN : 2)}
         >
           <img

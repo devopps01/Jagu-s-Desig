@@ -12,6 +12,7 @@ import Switch from '@mui/material/Switch'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 
+import { adminApi } from '@admin/libs/adminApi'
 import { calcGstAmount, defaultGstSettings, type GstSettings } from '@/libs/gst-types'
 
 const GstSettingsManager = () => {
@@ -21,10 +22,9 @@ const GstSettingsManager = () => {
   const [error, setError] = useState('')
 
   const load = async () => {
-    const res = await fetch('/api/admin/gst-settings')
-    const json = await res.json()
+    const result = await adminApi<GstSettings>('/api/admin/gst-settings', undefined, { silentSuccess: true })
 
-    if (res.ok) setSettings({ ...defaultGstSettings, ...json })
+    if (result.ok) setSettings({ ...defaultGstSettings, ...result.data })
   }
 
   useEffect(() => {
@@ -36,20 +36,25 @@ const GstSettingsManager = () => {
     setMessage('')
     setError('')
 
-    const res = await fetch('/api/admin/gst-settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings)
-    })
-    const json = await res.json()
+    const result = await adminApi<GstSettings>(
+      '/api/admin/gst-settings',
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+      },
+      { successMessage: 'GST settings saved' }
+    )
 
     setSaving(false)
 
-    if (!res.ok) {
-      setError(json.message || 'Could not save GST settings')
+    if (!result.ok) {
+      setError(result.message || 'Could not save GST settings')
 
       return
     }
+
+    const json = result.data
 
     setSettings({ ...defaultGstSettings, ...json })
     setMessage(

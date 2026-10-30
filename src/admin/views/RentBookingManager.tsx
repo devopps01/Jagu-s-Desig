@@ -1,46 +1,70 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import dynamic from 'next/dynamic'
+import Link from 'next/link'
+import { useParams } from 'next/navigation'
 
 import Button from '@mui/material/Button'
-import Card from '@mui/material/Card'
 import Chip from '@mui/material/Chip'
 import IconButton from '@mui/material/IconButton'
 import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
-import { toast } from 'react-toastify'
-
 import { AdminDataTable, useServerTable } from '@admin/components/table'
-import RentCalendar from '@admin/views/RentCalendar'
-import RentPreviewDialog, { type PreviewProduct } from '@admin/views/RentPreviewDialog'
-import RentFormDialog, { emptyRentForm, type RentFormValue } from '@admin/views/RentFormDialog'
-import AppFullCalendar from '@/libs/styles/AppFullCalendar'
+import { useConfirmDelete } from '@admin/hooks/useConfirmDelete'
+import { adminApi, adminMutate } from '@admin/libs/adminApi'
+import { loadAdminRentProducts, productNumber } from '@admin/views/RentFormDialog'
+import { type RentBill } from '@admin/views/rentBill'
+import CancelRefundDialog from '@admin/views/CancelRefundDialog'
+import MarkRentReturnedDialog, { type RentReturnPayload, type RentReturnSource } from '@admin/views/MarkRentReturnedDialog'
+import { linePayable } from '@/libs/return-fee'
 import type { RentBooking } from '@/libs/rentals'
 
-type ProductOption = PreviewProduct & {
+const RentBillDialog = dynamic(() => import('@admin/views/RentBillDialog'), { ssr: false })
+
+type ProductOption = {
   id: string
-  listingType: string
+  slug: string
+  name?: string
+  imageUrl?: string
+  listingType?: string
 }
 
 type RentalRow = RentBooking
 
-const toForm = (row?: Partial<RentalRow> | null, dates?: { startDate: string; endDate: string }): RentFormValue => ({
-  ...emptyRentForm,
-  ...row,
-  id: row?.id || '',
-  productId: row?.productId || '',
-  productSlug: row?.productSlug || '',
-  size: row?.size || 'M',
-  startDate: dates?.startDate || row?.startDate || '',
-  endDate: dates?.endDate || dates?.startDate || row?.endDate || '',
-  startTime: row?.startTime || '10:00',
-  endTime: row?.endTime || '18:00',
-  customerName: row?.customerName || '',
-  customerPhone: row?.customerPhone || '',
-  customerEmail: row?.customerEmail || '',
-  notes: row?.notes || '',
-  status: row?.status || 'booked'
-})
+const toBill = (row: RentalRow, products: ProductOption[]): RentBill => {
+  const outfit = products.find(item => item.slug === row.productSlug || item.id === row.productId)
+  const created = row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt || '')
+
+  return {
+    id: row.id,
+    productName: row.productName,
+    productNo: productNumber(outfit || { imageUrl: row.productImage, id: row.productId, slug: row.productSlug }),
+    size: row.size,
+    startDate: row.startDate,
+    endDate: row.endDate,
+    startTime: row.startTime || '10:00',
+    endTime: row.endTime || '18:00',
+    customerName: row.customerName,
+    customerPhone: row.customerPhone,
+    customerEmail: row.customerEmail || '',
+    notes: row.notes || '',
+    status: row.status,
+    productPrice: row.productPrice || 0,
+    finalPrice: row.finalPrice || 0,
+    paymentOption: row.paymentOption || 'unpaid',
+    paymentMethod: row.paymentMethod || 'Cash',
+    paymentNote: row.paymentNote || '',
+    paidAmount: row.paidAmount || 0,
+    balanceAmount: row.balanceAmount || 0,
+    gstEnabled: Boolean(row.gstEnabled),
+    gstRate: row.gstRate || 0,
+    gstAmount: row.gstAmount || 0,
+    discountAmount: row.discountAmount || 0,
+    payments: row.payments || [],
+    createdAt: created
+  }
+}
 
 const statusColor = (status: RentalRow['status']) => {
   if (status === 'ongoing') return 'warning'
@@ -51,108 +75,159 @@ const statusColor = (status: RentalRow['status']) => {
 }
 
 const RentBookingManager = () => {
+  const params = useParams()
+  const lang = String(params.lang || 'en')
+  const { askDelete, confirmDialog } = useConfirmDelete()
   const [statusFilter, setStatusFilter] = useState('')
   const extraParams = useMemo(() => ({ status: statusFilter }), [statusFilter])
+  const [cancelRow, setCancelRow] = useState<RentalRow | null>(null)
+  const [returnRow, setReturnRow] = useState<RentalRow | null>(null)
   const table = useServerTable<RentalRow>('/api/admin/rentals', { extraParams })
+  const cancelledTable = useServerTable<RentalRow>('/api/admin/rentals', { extraParams: { status: 'cancelled' } })
   const [products, setProducts] = useState<ProductOption[]>([])
-  const [form, setForm] = useState<RentFormValue>(emptyRentForm)
-  const [open, setOpen] = useState(false)
   const [bookings, setBookings] = useState<RentalRow[]>([])
-  const [preview, setPreview] = useState<RentalRow | null>(null)
+  const [bill, setBill] = useState<RentBill | null>(null)
+  const [nowQuery, setNowQuery] = useState('')
+  const [nowPage, setNowPage] = useState(1)
+  const [nowLimit, setNowLimit] = useState(10)
+  const today = useMemo(() => {
+    const date = new Date()
+
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  }, [])
+  const outNow = useMemo(() => {
+    const text = nowQuery.trim().toLowerCase()
+    const digits = text.replace(/\D/g, '')
+
+    return bookings.filter(row => {
+      if (row.status === 'cancelled' || row.status === 'returned') return false
+      if (!row.startDate || !row.endDate || row.startDate > today || row.endDate < today) return false
+
+      if (!text) return true
+
+      const blob = `${row.productName} ${row.size} ${row.customerName} ${row.customerPhone}`.toLowerCase()
+
+      if (blob.includes(text)) return true
+
+      return Boolean(digits && row.customerPhone.replace(/\D/g, '').includes(digits))
+    })
+  }, [bookings, nowQuery, today])
+  const outRows = outNow.slice((nowPage - 1) * nowLimit, nowPage * nowLimit)
 
   const loadBookings = async () => {
-    const res = await fetch('/api/admin/rentals?all=1')
-    const json = await res.json()
+    const result = await adminApi<{ data?: RentalRow[] }>('/api/admin/rentals?all=1', undefined, { silentSuccess: true })
 
-    setBookings(Array.isArray(json.data) ? json.data : [])
+    setBookings(Array.isArray(result.data?.data) ? result.data.data : [])
   }
 
   useEffect(() => {
-    fetch('/api/admin/products?limit=100')
-      .then(res => res.json())
-      .then(json => setProducts(json.data || []))
-      .catch(() => setProducts([]))
+    void loadAdminRentProducts().then(setProducts)
 
     void loadBookings()
   }, [])
 
-  const save = async (values: RentFormValue) => {
-    let res: Response
+  const markReturned = async (payload: RentReturnPayload) => {
+    if (!returnRow) return
 
-    try {
-      res = await fetch(values.id ? `/api/admin/rentals/${values.id}` : '/api/admin/rentals', {
-        method: values.id ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values)
-      })
-    } catch {
-      toast.error('Could not save rental. Please try again.')
-      throw new Error('Network error')
-    }
+    const result = await adminApi(
+      `/api/admin/rentals/${returnRow.id}`,
+      { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'return', ...payload }) },
+      { successMessage: 'Outfit marked returned' }
+    )
 
-    const json = await res.json().catch(() => ({}))
+    if (!result.ok) return
 
-    if (!res.ok) {
-      toast.error(json.message || 'Could not save rental. Please try again.')
-      throw new Error(json.message || 'Save failed')
-    }
-
-    toast.success(values.id ? 'Rental updated successfully' : 'Rental saved successfully')
-    setOpen(false)
-    setForm(emptyRentForm)
-    await table.reload()
-    await loadBookings()
-  }
-
-  const openAdd = (dates?: { startDate: string; endDate: string }) => {
-    setForm(toForm(null, dates))
-    setOpen(true)
-  }
-
-  const saveDates = async (row: RentalRow) => {
-    const res = await fetch(`/api/admin/rentals/${row.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(row)
-    })
-    const json = await res.json().catch(() => ({}))
-
-    if (!res.ok) {
-      toast.error(json.message || 'Could not update rental dates')
-      await loadBookings()
-
-      return
-    }
-
-    toast.success('Rental dates updated')
-    await table.reload()
-    await loadBookings()
+    setReturnRow(null)
+    await Promise.all([table.reload(), loadBookings()])
   }
 
   const removeBooking = async (row: RentalRow) => {
-    const res = await fetch(`/api/admin/rentals/${row.id}`, { method: 'DELETE' })
-    const json = await res.json().catch(() => ({}))
-
-    if (!res.ok) {
-      toast.error(json.message || 'Could not delete rental')
-
-      return
-    }
-
-    toast.success('Rental deleted')
-    await Promise.all([table.reload(), loadBookings()])
+    await adminMutate(
+      `/api/admin/rentals/${row.id}`,
+      { method: 'DELETE' },
+      { successMessage: 'Rental deleted', errorMessage: 'Could not delete rental' },
+      async () => {
+        await Promise.all([table.reload(), loadBookings()])
+      }
+    )
   }
 
   return (
     <>
-      <Card className='overflow-visible mbe-6'>
-        <AppFullCalendar className='app-calendar'>
-          <RentCalendar bookings={bookings} onAdd={openAdd} onSelect={row => setPreview(row)} onDatesChange={row => void saveDates(row)} />
-        </AppFullCalendar>
-      </Card>
+      <div className='mbe-6'>
       <AdminDataTable
-        title='Rent bookings'
-        subtitle='Track who rented which outfit, size, dates and time period.'
+        title='Out on rent now'
+        subtitle={outNow.length === 1 ? '1 outfit is with a customer today.' : `${outNow.length} outfits are with customers today.`}
+        search={nowQuery}
+        searchPlaceholder='Outfit, size or mobile...'
+        onSearchChange={value => {
+          setNowPage(1)
+          setNowQuery(value)
+        }}
+        onRefresh={() => void loadBookings()}
+        columns={[
+          {
+            id: 'product',
+            label: 'Outfit',
+            render: row => (
+              <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {row.productImage ? <img src={row.productImage} alt='' width={40} height={54} style={{ objectFit: 'cover', borderRadius: 4 }} /> : null}
+                {row.productName}
+              </span>
+            )
+          },
+          { id: 'size', label: 'Size' },
+          {
+            id: 'customer',
+            label: 'Customer',
+            render: row => (
+              <span>
+                {row.customerName}
+                <br />
+                {row.customerPhone}
+              </span>
+            )
+          },
+          {
+            id: 'period',
+            label: 'Period',
+            render: row => (
+              <span>
+                {row.startDate} → {row.endDate}
+              </span>
+            )
+          },
+          {
+            id: 'status',
+            label: 'Status',
+            render: row => <Chip size='small' color={statusColor(row.status)} label={row.status} />
+          },
+          {
+            id: 'actions',
+            label: 'Actions',
+            render: row => (
+              <IconButton size='small' color='primary' aria-label='Mark returned' title='Mark returned' onClick={() => setReturnRow(row)}>
+                <i className='tabler-package-import' />
+              </IconButton>
+            )
+          }
+        ]}
+        rows={outRows}
+        rowKey={row => row.id}
+        total={outNow.length}
+        page={nowPage}
+        limit={nowLimit}
+        emptyText='No outfits are out on rent today.'
+        onPageChange={setNowPage}
+        onLimitChange={value => {
+          setNowLimit(value)
+          setNowPage(1)
+        }}
+      />
+      </div>
+      <AdminDataTable
+        title='Rent store'
+        subtitle='Cancel one outfit on a bill. That piece is free to book again and moves to the cancelled list.'
         search={table.search}
         searchPlaceholder='Search customer, phone or product...'
         onSearchChange={table.setSearch}
@@ -167,10 +242,9 @@ const RentBookingManager = () => {
               <MenuItem value='booked'>Booked</MenuItem>
               <MenuItem value='ongoing'>Ongoing</MenuItem>
               <MenuItem value='returned'>Returned</MenuItem>
-              <MenuItem value='cancelled'>Cancelled</MenuItem>
             </TextField>
-            <Button variant='contained' startIcon={<i className='tabler-plus' />} onClick={() => openAdd()}>
-              Add rental
+            <Button component={Link} href={`/${lang}/store/rentals/book`} variant='contained' startIcon={<i className='tabler-plus' />}>
+              Book rent
             </Button>
           </>
         }
@@ -203,8 +277,24 @@ const RentBookingManager = () => {
                 {row.customerName}
                 <br />
                 {row.customerPhone}
+                {row.customerEmail ? (
+                  <>
+                    <br />
+                    {row.customerEmail}
+                  </>
+                ) : null}
               </span>
             )
+          },
+          {
+            id: 'payment',
+            label: 'Payment',
+            render: row => {
+              const option = row.paymentOption === 'half' ? 'Half' : row.paymentOption === 'full' ? 'Full' : row.paymentOption === 'custom' ? 'Custom' : 'Unpaid'
+              const left = Number(row.balanceAmount) || 0
+
+              return `${option}${row.paymentMethod ? ` · ${row.paymentMethod}` : ''} · ${left ? `₹${left.toLocaleString('en-IN')} left` : 'Paid'}`
+            }
           },
           {
             id: 'status',
@@ -216,18 +306,38 @@ const RentBookingManager = () => {
             label: 'Actions',
             render: row => (
               <>
-                <IconButton
-                  size='small'
-                  onClick={() => {
-                    setForm(toForm(row))
-                    setOpen(true)
-                  }}
-                >
+                <IconButton size='small' color='primary' onClick={() => setBill(toBill(row, products))} aria-label={`Bill for ${row.productName}`}>
+                  <i className='tabler-receipt' />
+                </IconButton>
+                <IconButton size='small' component='a' href={`/rent/${row.productSlug}`} target='_blank' aria-label='Open on rent site'>
+                  <i className='tabler-external-link' />
+                </IconButton>
+                <IconButton size='small' component={Link} href={`/${lang}/store/rentals/book?id=${row.id}`} aria-label={`Edit ${row.productName}`}>
                   <i className='tabler-edit' />
                 </IconButton>
-                <IconButton size='small' color='error' onClick={() => void removeBooking(row)}>
-                  <i className='tabler-trash' />
-                </IconButton>
+                {row.status === 'booked' || row.status === 'ongoing' ? (
+                  <IconButton size='small' color='primary' aria-label='Mark returned' title='Mark returned' onClick={() => setReturnRow(row)}>
+                    <i className='tabler-package-import' />
+                  </IconButton>
+                ) : null}
+                {row.status === 'booked' || row.status === 'ongoing' ? (
+                  <IconButton size='small' color='error' aria-label='Cancel' title='Cancel' onClick={() => setCancelRow(row)}>
+                    <i className='tabler-circle-x' />
+                  </IconButton>
+                ) : (
+                  <IconButton
+                    size='small'
+                    color='error'
+                    onClick={() =>
+                      askDelete({
+                        name: `${row.productName} · ${row.customerName}`,
+                        onConfirm: () => void removeBooking(row)
+                      })
+                    }
+                  >
+                    <i className='tabler-trash' />
+                  </IconButton>
+                )}
               </>
             )
           }
@@ -242,20 +352,63 @@ const RentBookingManager = () => {
         onPageChange={table.setPage}
         onLimitChange={table.setLimit}
       />
-      <RentPreviewDialog
-        open={Boolean(preview)}
-        booking={preview}
-        product={products.find(item => item.slug === preview?.productSlug) || { slug: preview?.productSlug || '', imageUrl: preview?.productImage, name: preview?.productName }}
-        onClose={() => setPreview(null)}
-        onEdit={() => {
-          if (!preview) return
+      <div className='mbs-6' />
+      <AdminDataTable
+        title='Cancelled rentals'
+        subtitle='Each cancelled booking shows the return fee kept and the amount given back.'
+        search={cancelledTable.search}
+        searchPlaceholder='Search customer, phone or product...'
+        onSearchChange={cancelledTable.setSearch}
+        onRefresh={() => void cancelledTable.reload()}
+        columns={[
+          { id: 'product', label: 'Outfit', render: row => row.productName },
+          { id: 'size', label: 'Size' },
+          {
+            id: 'period',
+            label: 'Period',
+            render: row => `${row.startDate} → ${row.endDate}`
+          },
+          { id: 'customer', label: 'Customer', render: row => row.customerName },
+          { id: 'phone', label: 'Mobile', render: row => row.customerPhone },
+          { id: 'paid', label: 'Paid', render: row => `₹${Math.round(row.paidAmount || 0).toLocaleString('en-IN')}` },
+          { id: 'fee', label: 'Return fee', render: row => `₹${Math.round(row.returnFee || 0).toLocaleString('en-IN')}` },
+          { id: 'refund', label: 'Returned', render: row => `₹${Math.round(row.refundAmount || 0).toLocaleString('en-IN')}` }
+        ]}
+        rows={cancelledTable.rows}
+        rowKey={row => row.id}
+        total={cancelledTable.total}
+        page={cancelledTable.page}
+        limit={cancelledTable.limit}
+        loading={cancelledTable.loading}
+        emptyText='No cancelled rentals.'
+        onPageChange={cancelledTable.setPage}
+        onLimitChange={cancelledTable.setLimit}
+      />
+      <RentBillDialog open={Boolean(bill)} bill={bill} onClose={() => setBill(null)} />
+      <MarkRentReturnedDialog open={Boolean(returnRow)} source={returnRow as RentReturnSource | null} onClose={() => setReturnRow(null)} onConfirm={markReturned} />
+      <CancelRefundDialog
+        open={Boolean(cancelRow)}
+        outfit={cancelRow ? `${cancelRow.productName}, size ${cancelRow.size}` : ''}
+        detail='Only this booking is cancelled. That size is free for those dates again.'
+        payable={cancelRow ? linePayable(cancelRow) : 0}
+        paid={cancelRow?.paidAmount || 0}
+        onClose={() => setCancelRow(null)}
+        onConfirm={async returnFee => {
+          if (!cancelRow) return
 
-          setForm(toForm(preview))
-          setPreview(null)
-          setOpen(true)
+          const result = await adminApi(
+            `/api/admin/rentals/${cancelRow.id}`,
+            { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cancel', returnFee }) },
+            { successMessage: 'Booking cancelled' }
+          )
+
+          if (!result.ok) return
+
+          setCancelRow(null)
+          await Promise.all([table.reload(), cancelledTable.reload(), loadBookings()])
         }}
       />
-      <RentFormDialog open={open} initial={form} products={products} availability='' onClose={() => setOpen(false)} onSave={save} />
+      {confirmDialog}
     </>
   )
 }

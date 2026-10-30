@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb'
 import { withoutSareeWord } from '@/libs/public-label'
 
 import { getDb } from '@/libs/mongo'
+import { isSizeOutOfStock, stockCount, stockSizeKey } from '@/libs/rent-sizes'
 import { searchRegex, tableResponse, type TableQuery } from '@/libs/table-query'
 
 export type OrderStatus = 'pending' | 'confirmed' | 'packed' | 'shipped' | 'delivered' | 'cancelled' | 'returned'
@@ -65,6 +66,37 @@ export type WebOrderInput = {
   orderStatus?: OrderStatus
   razorpayOrderId?: string
   razorpayPaymentId?: string
+}
+
+const ACTIVE_SALE = ['pending', 'confirmed', 'packed', 'shipped', 'delivered']
+
+/** Pieces already sold for one outfit, grouped by size. Cancelled and returned orders are not counted. */
+export const saleSizeSold = async (slug: string) => {
+  const value = slug.trim()
+
+  if (!value) return {}
+
+  const db = await getDb()
+  const rows = await db
+    .collection('WebOrder')
+    .aggregate<{ _id: string; qty: number }>([
+      { $match: { status: { $in: ACTIVE_SALE } } },
+      { $unwind: '$items' },
+      { $match: { 'items.slug': value } },
+      { $group: { _id: '$items.size', qty: { $sum: '$items.qty' } } }
+    ])
+    .toArray()
+  const sold: Record<string, number> = {}
+
+  for (const row of rows) {
+    const key = stockSizeKey(String(row._id || ''))
+
+    if (!key) continue
+
+    sold[key] = (sold[key] || 0) + (Number(row.qty) || 0)
+  }
+
+  return sold
 }
 
 const nextNumbers = async () => {
@@ -132,6 +164,40 @@ export const createWebOrder = async (input: WebOrderInput) => {
 
   if (!name || !phone) throw new Error('Name and phone are required')
   if (!input.items?.length) throw new Error('Bag is empty')
+
+  const slugs = [...new Set(input.items.map(item => String(item.slug || '').trim()).filter(Boolean))]
+  const products = await db
+    .collection<{ slug: string; listingType?: string; saleSizeStock?: Record<string, number>; saleOutOfStock?: string[]; name?: string }>('Product')
+    .find({ slug: { $in: slugs } })
+    .project({ slug: 1, listingType: 1, saleSizeStock: 1, saleOutOfStock: 1, name: 1 })
+    .toArray()
+  const bySlug = new Map(products.map(product => [product.slug, product]))
+
+  for (const item of input.items) {
+    const product = bySlug.get(String(item.slug || '').trim())
+
+    if (!product || product.listingType === 'rent') continue
+
+    const key = stockSizeKey(String(item.size || ''))
+
+    if (key && isSizeOutOfStock(product.saleOutOfStock, key)) {
+      throw new Error(`${product.name || item.title || 'This outfit'} is out of stock in size ${key}`)
+    }
+
+    const cap = stockCount(product.saleSizeStock, key)
+
+    if (cap === null || !key) continue
+
+    const sold = (await saleSizeSold(product.slug))[key] || 0
+    const qty = Math.max(1, Number(item.qty) || 1)
+    const left = Math.max(0, cap - sold)
+
+    if (qty > left) {
+      const label = product.name || item.title || 'This outfit'
+
+      throw new Error(left ? `Only ${left} left to sell in size ${key} for ${label}` : `${label} is sold out in size ${key}`)
+    }
+  }
 
   const now = new Date()
   const numbers = await nextNumbers()
@@ -284,16 +350,41 @@ export const updateOrderStatus = async (id: string, status: OrderStatus, payment
   if (!orderStatuses.includes(status)) throw new Error('Invalid status')
 
   const db = await getDb()
+  const current = await db.collection('WebOrder').findOne({ _id: new ObjectId(id) })
+
+  if (!current) throw new Error('Order not found')
+
+  const currentStatus = String(current.status || 'pending')
+
+  if (status === 'cancelled') {
+    if (currentStatus === 'cancelled') throw new Error('This order is already cancelled')
+    if (currentStatus === 'delivered' || currentStatus === 'returned') {
+      throw new Error('A delivered order stays on the books. Mark it returned instead.')
+    }
+  }
+
   const now = new Date()
   const $set: Record<string, unknown> = { status, updatedAt: now }
+  const currentPayment = current.payment === 'paid' || current.payment === 'refunded' ? current.payment : 'cod'
 
   if (payment === 'cod' || payment === 'paid' || payment === 'refunded') $set.payment = payment
   if (status === 'delivered') {
     $set.payment = 'paid'
     $set.deliveredAt = now
   }
-  if (status === 'cancelled') $set.cancelledAt = now
+  if (status === 'cancelled') {
+    $set.cancelledAt = now
+    $set.cancelRequestStatus = 'completed'
+    if (currentPayment === 'paid') $set.payment = 'refunded'
+  }
   if (status === 'returned') $set.returnedAt = now
 
-  await db.collection('WebOrder').updateOne({ _id: new ObjectId(id) }, { $set })
+  await db.collection('WebOrder').updateOne({ _id: current._id }, { $set })
+
+  if (status === 'cancelled') {
+    await db.collection('OrderRequest').updateMany(
+      { orderId: id, type: 'cancel', status: 'requested' },
+      { $set: { status: 'completed', updatedAt: now } }
+    )
+  }
 }

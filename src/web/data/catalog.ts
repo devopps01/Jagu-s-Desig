@@ -29,6 +29,16 @@ export type StoreProduct = {
   styles?: string[]
   details?: { label: string; value: string }[]
   sizes?: string[]
+  /** Pieces available to rent for each size. */
+  rentSizeStock?: Record<string, number>
+  /** Pieces available to sell for each size. Missing size means no selling cap. */
+  saleSizeStock?: Record<string, number>
+  /** Pieces already sold, by size. Set on the product page. */
+  saleSold?: Record<string, number>
+  /** Sizes an admin marked out of stock for selling. */
+  saleOutOfStock?: string[]
+  /** Sizes an admin marked out of stock for rent. */
+  rentOutOfStock?: string[]
   category: 'saree' | 'lehenga' | 'kurti' | 'dress'
   collections: string[]
   image: string
@@ -103,12 +113,13 @@ export const navItems: {
   { label: 'Best Sellers', href: '/collections/best-sellers' },
   {
     label: 'Craft Stories',
-    href: '/craft-stories',
+    href: '/blog',
     columns: [
       {
         title: 'Story Of India Hidden Gems',
         links: [
-          { label: 'View All', href: '/craft-stories' },
+          { label: 'Blog', href: '/blog' },
+          { label: 'View All', href: '/blog' },
           { label: 'Ajrakh', href: '/collections/ajrakh' },
           { label: 'Baagh', href: '/collections/baagh' },
           { label: 'Bagru', href: '/collections/bagru' },

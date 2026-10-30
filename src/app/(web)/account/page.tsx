@@ -37,7 +37,6 @@ type OrderRow = {
   shipping?: number
   items: OrderItem[]
   customer: { address?: string; city?: string; pincode?: string; phone?: string; name?: string }
-  sisterName?: string
   discountCode?: string
   discountAmount?: number
   gstAmount?: number
@@ -167,7 +166,7 @@ const AccountDesk = () => {
                   <span>Order value</span>
                 </article>
               </div>
-              <p>Welcome back. Track orders, save pieces you love, and share your referral code with sisters and friends.</p>
+              <p>Welcome back. Track orders, save pieces you love, and share your referral code with friends.</p>
               <div className='vn-account-actions'>
                 <button className='vn-btn vn-btn-solid' type='button' onClick={() => setTab('orders')}>
                   View orders
@@ -232,7 +231,6 @@ const AccountDesk = () => {
                       gstLabel={order.gstLabel}
                       total={order.total}
                     />
-                    {order.sisterName ? <p className='vn-drawer-note'>Sister: {order.sisterName}</p> : null}
                     {order.cancelRequestStatus ? <p className='vn-drawer-note'>Cancel request: {order.cancelRequestStatus}</p> : null}
                     {order.returnRequestStatus ? <p className='vn-drawer-note'>Return request: {order.returnRequestStatus}</p> : null}
                     <div className='vn-account-actions'>
@@ -298,7 +296,7 @@ const AccountDesk = () => {
           {tab === 'referral' && user ? (
             <div className='vn-referral'>
               <h2>Referral</h2>
-              <p>Give your referral code to a sister or friend. They can mention it at checkout, and you stay credited.</p>
+              <p>Give your referral code to a friend. They can use it when they shop, and you stay credited.</p>
               <div className='vn-referral-code'>{referralCode || 'Loading…'}</div>
               <p className='vn-drawer-note'>{referralLink}</p>
               <div className='vn-account-actions'>

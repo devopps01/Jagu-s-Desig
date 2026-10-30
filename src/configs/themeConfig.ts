@@ -55,7 +55,7 @@ export type Config = {
 
 const themeConfig: Config = {
   templateName: "Jagu's Designing",
-  homePageUrl: '/store/home-page',
+  homePageUrl: '/store/dashboard',
   settingsCookieName: 'vuexy-mui-next-demo-1',
   mode: 'system', // 'system', 'light', 'dark'
   skin: 'default', // 'default', 'bordered'

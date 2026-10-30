@@ -11,6 +11,8 @@ import IconButton from '@mui/material/IconButton'
 import Typography from '@mui/material/Typography'
 
 import { AdminDataTable, useServerTable } from '@admin/components/table'
+import { useConfirmDelete } from '@admin/hooks/useConfirmDelete'
+import { adminApi, adminMutate } from '@admin/libs/adminApi'
 
 type SubscriberRow = {
   id: string
@@ -27,16 +29,16 @@ type Stats = {
 const emptyStats: Stats = { total: 0, thisWeek: 0 }
 
 const NewsletterSubscribersManager = () => {
+  const { askDelete, confirmDialog } = useConfirmDelete()
   const params = useParams()
   const lang = String(params?.lang || 'en')
   const table = useServerTable<SubscriberRow>('/api/admin/newsletter-subscribers')
   const [stats, setStats] = useState<Stats>(emptyStats)
 
   const loadStats = async () => {
-    const res = await fetch('/api/admin/newsletter-subscribers/stats')
-    const json = await res.json()
+    const result = await adminApi<Stats>('/api/admin/newsletter-subscribers/stats', undefined, { silentSuccess: true })
 
-    if (res.ok) setStats(json)
+    if (result.ok) setStats(result.data)
   }
 
   useEffect(() => {
@@ -44,11 +46,15 @@ const NewsletterSubscribersManager = () => {
   }, [table.rows])
 
   const remove = async (id: string) => {
-    if (!window.confirm('Remove this subscriber?')) return
-
-    await fetch(`/api/admin/newsletter-subscribers/${id}`, { method: 'DELETE' })
-    await table.reload()
-    await loadStats()
+    await adminMutate(
+      `/api/admin/newsletter-subscribers/${id}`,
+      { method: 'DELETE' },
+      { successMessage: 'Subscriber removed' },
+      async () => {
+        await table.reload()
+        await loadStats()
+      }
+    )
   }
 
   return (
@@ -102,7 +108,17 @@ const NewsletterSubscribersManager = () => {
               id: 'actions',
               label: 'Actions',
               render: row => (
-                <IconButton size='small' color='error' onClick={() => void remove(row.id)} aria-label='Delete'>
+                <IconButton
+                  size='small'
+                  color='error'
+                  onClick={() =>
+                    askDelete({
+                      name: row.email,
+                      onConfirm: () => void remove(row.id)
+                    })
+                  }
+                  aria-label='Delete'
+                >
                   <i className='tabler-trash' />
                 </IconButton>
               )
@@ -119,6 +135,7 @@ const NewsletterSubscribersManager = () => {
           onLimitChange={table.setLimit}
         />
       </Grid>
+      {confirmDialog}
     </Grid>
   )
 }

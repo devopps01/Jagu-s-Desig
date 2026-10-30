@@ -12,7 +12,6 @@ import StorefrontEngage from '@web/components/StorefrontEngage'
 import StoreHeader, { CartDrawer } from '@web/components/StoreHeader'
 import BrandLogo from '@/components/BrandLogo'
 import { SURAT_ATELIER } from '@/libs/contact-types'
-import { captureSisterCodeFromUrl } from '@web/lib/sister-referral'
 import { SiteChromeProvider, useSiteChrome } from '@web/lib/site-chrome'
 import { SiteThemeProvider } from '@web/lib/site-theme'
 import { defaultFooterInfoLinks, defaultFooterPolicyLinks } from '@/libs/site-chrome-types'
@@ -170,10 +169,6 @@ const StoreFooter = () => {
 
 const StorefrontShell = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname()
-
-  useEffect(() => {
-    captureSisterCodeFromUrl()
-  }, [])
 
   useEffect(() => {
     const chrome = document.querySelector('.vn-chrome')

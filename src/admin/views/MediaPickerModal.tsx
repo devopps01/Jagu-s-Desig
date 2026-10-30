@@ -16,6 +16,7 @@ import { Controller, useForm } from 'react-hook-form'
 import * as yup from 'yup'
 
 import CustomTextField from '@core/components/mui/TextField'
+import { adminApi } from '@admin/libs/adminApi'
 import ImageDropCard from '@admin/views/ImageDropCard'
 
 export type PickedMedia = {
@@ -91,17 +92,20 @@ const MediaPickerModal = ({
   }, [previewUrl])
 
   const load = async (folderPath: string) => {
-    const res = await fetch(`/api/admin/media/folders?path=${encodeURIComponent(folderPath)}`)
-    const json = await res.json()
+    const result = await adminApi<FolderPayload>(
+      `/api/admin/media/folders?path=${encodeURIComponent(folderPath)}`,
+      undefined,
+      { silentSuccess: true }
+    )
 
-    if (!res.ok) {
-      setError(json.message || 'Could not open folder')
+    if (!result.ok) {
+      setError(result.message || 'Could not open folder')
 
       return
     }
 
-    setData(json)
-    setCurrentPath(json.path || folderPath)
+    setData(result.data)
+    setCurrentPath(result.data.path || folderPath)
     setError('')
   }
 
@@ -122,21 +126,24 @@ const MediaPickerModal = ({
   const crumbs = (currentPath || '').split('/').filter(Boolean)
 
   const createFolder = async () => {
-    const res = await fetch('/api/admin/media/folders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: currentPath, name: newFolder })
-    })
-    const json = await res.json()
+    const result = await adminApi<FolderPayload>(
+      '/api/admin/media/folders',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: currentPath, name: newFolder })
+      },
+      { successMessage: 'Folder created' }
+    )
 
-    if (!res.ok) {
-      setError(json.message || 'Could not create folder')
+    if (!result.ok) {
+      setError(result.message || 'Could not create folder')
 
       return
     }
 
     setNewFolder('')
-    await load(json.path)
+    await load(result.data.path)
   }
 
   const onSaveImage = handleSubmit(async values => {
@@ -156,18 +163,21 @@ const MediaPickerModal = ({
     form.append('name', values.name.trim())
     form.append('alt', values.alt.trim())
 
-    const res = await fetch('/api/admin/media/upload', { method: 'POST', body: form })
-    const json = await res.json()
+    const result = await adminApi<{ url: string; name: string; alt: string }>(
+      '/api/admin/media/upload',
+      { method: 'POST', body: form },
+      { successMessage: 'Image uploaded' }
+    )
 
     setLoading(false)
 
-    if (!res.ok) {
-      setError(json.message || 'Upload failed')
+    if (!result.ok) {
+      setError(result.message || 'Upload failed')
 
       return
     }
 
-    onSelect({ url: json.url, name: json.name, alt: json.alt })
+    onSelect({ url: result.data.url, name: result.data.name, alt: result.data.alt })
     onClose()
   })
 

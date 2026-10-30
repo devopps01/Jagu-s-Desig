@@ -17,6 +17,8 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 
 import { AdminDataTable, useServerTable } from '@admin/components/table'
+import { useConfirmDelete } from '@admin/hooks/useConfirmDelete'
+import { adminApi, adminMutate } from '@admin/libs/adminApi'
 import { slugify } from '@/libs/slug'
 
 type StyleRow = {
@@ -38,6 +40,7 @@ const emptyForm = {
 }
 
 const StyleManager = () => {
+  const { askDelete, confirmDialog } = useConfirmDelete()
   const [statusFilter, setStatusFilter] = useState('')
   const extraParams = useMemo(() => ({ status: statusFilter }), [statusFilter])
   const table = useServerTable<StyleRow>('/api/admin/styles', { extraParams })
@@ -56,15 +59,14 @@ const StyleManager = () => {
   const save = async () => {
     setError('')
 
-    const res = await fetch(form.id ? `/api/admin/styles/${form.id}` : '/api/admin/styles', {
+    const result = await adminApi(form.id ? `/api/admin/styles/${form.id}` : '/api/admin/styles', {
       method: form.id ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form)
-    })
-    const json = await res.json()
+    }, { successMessage: form.id ? 'Style updated' : 'Style saved' })
 
-    if (!res.ok) {
-      setError(json.message || 'Save failed')
+    if (!result.ok) {
+      setError(result.message || 'Save failed')
 
       return
     }
@@ -135,11 +137,16 @@ const StyleManager = () => {
               <Switch
                 checked={row.status === 'active'}
                 onChange={() =>
-                  void fetch(`/api/admin/styles/${row.id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: row.status === 'active' ? 'inactive' : 'active' })
-                  }).then(() => table.reload())
+                  void adminMutate(
+                    `/api/admin/styles/${row.id}`,
+                    {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ status: row.status === 'active' ? 'inactive' : 'active' })
+                    },
+                    { successMessage: 'Status updated' },
+                    () => table.reload()
+                  )
                 }
               />
             )
@@ -159,7 +166,22 @@ const StyleManager = () => {
                 >
                   <i className='tabler-edit' />
                 </IconButton>
-                <IconButton size='small' color='error' onClick={() => void fetch(`/api/admin/styles/${row.id}`, { method: 'DELETE' }).then(() => table.reload())}>
+                <IconButton
+                  size='small'
+                  color='error'
+                  onClick={() =>
+                    askDelete({
+                      name: row.name,
+                      onConfirm: () =>
+                        adminMutate(
+                          `/api/admin/styles/${row.id}`,
+                          { method: 'DELETE' },
+                          { successMessage: 'Style deleted' },
+                          () => table.reload()
+                        )
+                    })
+                  }
+                >
                   <i className='tabler-trash' />
                 </IconButton>
               </>
@@ -220,6 +242,7 @@ const StyleManager = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      {confirmDialog}
     </>
   )
 }

@@ -1,11 +1,12 @@
-import { ObjectId } from 'mongodb'
+import { ObjectId, type Filter } from 'mongodb'
 
 import { applyGoogleRatingToProduct, applyGoogleRatingToProducts } from '@/libs/google-reviews'
 import { getDb } from '@/libs/mongo'
 import { slugify } from '@/libs/slug'
 import { searchRegex, tableResponse, type TableQuery } from '@/libs/table-query'
 import { withoutSareeWord } from '@/libs/public-label'
-import { productSizes } from '@/libs/rent-sizes'
+import { normalizeSaleStock, normalizeSizeStock, productSizes } from '@/libs/rent-sizes'
+import { saleSizeSold } from '@/libs/orders'
 import type { StoreProduct } from '@web/data/catalog'
 
 export type ListingType = 'sale' | 'rent' | 'both'
@@ -34,12 +35,18 @@ export type ProductDoc = {
   style: string
   styles?: string[]
   sizes?: string[]
+  sizeStock?: Record<string, number>
+  rentSizeStock?: Record<string, number>
+  saleSizeStock?: Record<string, number>
+  saleOutOfStock?: string[]
+  rentOutOfStock?: string[]
   details?: { label: string; value: string }[]
   seoTitle: string
   seoDescription: string
   status: ProductStatus
   isBestSeller?: boolean
   isTrending?: boolean
+  productNo?: number
   rating: number
   reviews: number
   createdAt: Date
@@ -82,6 +89,16 @@ export const toStoreProduct = (doc: ProductDoc): StoreProduct => ({
       : doc.style || 'Chaniya Choli',
   styles: Array.isArray(doc.styles) ? doc.styles.map(item => String(item || '').trim()).filter(Boolean) : [],
   sizes: Array.isArray(doc.sizes) ? productSizes(doc.sizes) : undefined,
+  rentSizeStock: normalizeSizeStock(
+    Array.isArray(doc.sizes) ? productSizes(doc.sizes) : productSizes(undefined),
+    doc.rentSizeStock || doc.sizeStock
+  ),
+  saleSizeStock: normalizeSaleStock(
+    Array.isArray(doc.sizes) ? productSizes(doc.sizes) : productSizes(undefined),
+    doc.saleSizeStock
+  ),
+  saleOutOfStock: Array.isArray(doc.saleOutOfStock) ? doc.saleOutOfStock.filter(Boolean) : [],
+  rentOutOfStock: Array.isArray(doc.rentOutOfStock) ? doc.rentOutOfStock.filter(Boolean) : [],
   details: Array.isArray(doc.details)
     ? doc.details
         .map(row => ({ label: String(row?.label || '').trim(), value: String(row?.value || '').trim() }))
@@ -117,17 +134,24 @@ const mapProduct = (doc: ProductDoc) => ({
   status: doc.status,
   isBestSeller: Boolean(doc.isBestSeller),
   isTrending: Boolean(doc.isTrending),
+  productNo: Number(doc.productNo) || 0,
   createdAt: doc.createdAt,
   updatedAt: doc.updatedAt
 })
 
 export const listProductsTable = async (query: TableQuery) => {
+  await ensureProductNumbers()
   const db = await getDb()
   const regex = query.search ? searchRegex(query.search) : null
   const filter: Record<string, unknown> = {}
 
   if (regex) {
-    filter.$or = [{ name: regex }, { slug: regex }, { description: regex }, { seoTitle: regex }]
+    const or: Record<string, unknown>[] = [{ name: regex }, { slug: regex }, { description: regex }, { seoTitle: regex }]
+    const digits = query.search.trim()
+
+    if (/^\d+$/.test(digits)) or.push({ productNo: Number(digits) })
+
+    filter.$or = or
   }
 
   if (query.status === 'active' || query.status === 'inactive') filter.status = query.status
@@ -259,8 +283,34 @@ export const searchStoreProducts = async (search: string, limit = 8) => {
 export const getStoreProduct = async (slug: string) => {
   const db = await getDb()
   const doc = await db.collection<ProductDoc>('Product').findOne({ slug, status: 'active' })
+  const product = doc ? toStoreProduct(doc) : null
 
-  return applyGoogleRatingToProduct(doc ? toStoreProduct(doc) : null)
+  if (product && product.listingType !== 'rent') {
+    product.saleSold = await saleSizeSold(slug)
+  }
+
+  return applyGoogleRatingToProduct(product)
+}
+
+const rentListingFilter = {
+  status: 'active' as const,
+  listingType: { $in: ['rent', 'both'] as ListingType[] },
+  rentPrice: { $gt: 0 }
+}
+
+/** Active outfits that can be rented. Sale-only products are excluded. */
+export const listRentStoreProducts = async () => {
+  const db = await getDb()
+  const rows = await db.collection<ProductDoc>('Product').find(rentListingFilter).sort({ createdAt: -1 }).toArray()
+
+  return rows.map(toStoreProduct)
+}
+
+export const getRentStoreProduct = async (slug: string) => {
+  const db = await getDb()
+  const doc = await db.collection<ProductDoc>('Product').findOne({ slug, ...rentListingFilter })
+
+  return doc ? toStoreProduct(doc) : null
 }
 
 type ProductInput = {
@@ -285,6 +335,8 @@ type ProductInput = {
   style: string
   styles?: string[]
   sizes?: string[]
+  rentSizeStock?: Record<string, number>
+  saleSizeStock?: Record<string, number>
   details?: { label: string; value: string }[]
   seoTitle: string
   seoDescription: string
@@ -330,6 +382,8 @@ const normalize = (input: ProductInput) => {
     design: input.design.trim(),
     styles: [...new Set((Array.isArray(input.styles) ? input.styles : []).map(item => String(item || '').trim()).filter(Boolean))].slice(0, 20),
     sizes: productSizes(input.sizes),
+    rentSizeStock: normalizeSizeStock(productSizes(input.sizes), input.rentSizeStock),
+    saleSizeStock: normalizeSaleStock(productSizes(input.sizes), input.saleSizeStock),
     style: ([...new Set((Array.isArray(input.styles) ? input.styles : []).map(item => String(item || '').trim()).filter(Boolean))][0] ||
       input.style.trim() ||
       'Chaniya Choli'),
@@ -345,6 +399,25 @@ const normalize = (input: ProductInput) => {
   }
 }
 
+export const ensureProductNumbers = async () => {
+  const db = await getDb()
+  const missing = await db
+    .collection<ProductDoc>('Product')
+    .find({ $or: [{ productNo: { $exists: false } }, { productNo: null }, { productNo: 0 }] } as Filter<ProductDoc>)
+    .sort({ createdAt: 1 })
+    .toArray()
+
+  if (!missing.length) return
+
+  const [latest] = await db.collection<ProductDoc>('Product').find({ productNo: { $gt: 0 } }).sort({ productNo: -1 }).limit(1).toArray()
+  let next = Number(latest?.productNo) || 0
+
+  for (const doc of missing) {
+    next += 1
+    await db.collection('Product').updateOne({ _id: doc._id }, { $set: { productNo: next } })
+  }
+}
+
 export const createProduct = async (input: ProductInput) => {
   const data = normalize(input)
   const db = await getDb()
@@ -352,9 +425,12 @@ export const createProduct = async (input: ProductInput) => {
 
   if (exists) throw new Error('Slug already exists')
 
+  await ensureProductNumbers()
+  const [latest] = await db.collection<ProductDoc>('Product').find({ productNo: { $gt: 0 } }).sort({ productNo: -1 }).limit(1).toArray()
   const now = new Date()
   const result = await db.collection('Product').insertOne({
     ...data,
+    productNo: (Number(latest?.productNo) || 0) + 1,
     rating: 0,
     reviews: 0,
     createdAt: now,

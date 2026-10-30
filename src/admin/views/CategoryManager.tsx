@@ -10,6 +10,8 @@ import Switch from '@mui/material/Switch'
 import TextField from '@mui/material/TextField'
 
 import { AdminDataTable, useServerTable } from '@admin/components/table'
+import { useConfirmDelete } from '@admin/hooks/useConfirmDelete'
+import { adminApi, adminMutate } from '@admin/libs/adminApi'
 import CategoryFormModal, { type CategoryFormValue } from '@admin/views/CategoryFormModal'
 import MediaPickerModal, { type PickedMedia } from '@admin/views/MediaPickerModal'
 
@@ -41,6 +43,7 @@ const emptyForm: CategoryFormValue = {
 }
 
 const CategoryManager = () => {
+  const { askDelete, confirmDialog } = useConfirmDelete()
   const [statusFilter, setStatusFilter] = useState('')
   const extraParams = useMemo(() => ({ status: statusFilter }), [statusFilter])
   const table = useServerTable<CategoryRow>('/api/admin/categories', { extraParams })
@@ -90,15 +93,14 @@ const CategoryManager = () => {
       status: form.status
     }
 
-    const res = await fetch(form.id ? `/api/admin/categories/${form.id}` : '/api/admin/categories', {
+    const result = await adminApi(form.id ? `/api/admin/categories/${form.id}` : '/api/admin/categories', {
       method: form.id ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
-    })
-    const json = await res.json()
+    }, { successMessage: form.id ? 'Category updated' : 'Category saved' })
 
-    if (!res.ok) {
-      setError(json.message || 'Save failed')
+    if (!result.ok) {
+      setError(result.message || 'Save failed')
 
       return
     }
@@ -110,17 +112,21 @@ const CategoryManager = () => {
   }
 
   const remove = async (id: string) => {
-    await fetch(`/api/admin/categories/${id}`, { method: 'DELETE' })
+    await adminMutate(`/api/admin/categories/${id}`, { method: 'DELETE' }, { successMessage: 'Category deleted' })
     await loadMains()
     await table.reload()
   }
 
   const toggleStatus = async (row: CategoryRow) => {
-    await fetch(`/api/admin/categories/${row.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: row.status === 'active' ? 'inactive' : 'active' })
-    })
+    await adminMutate(
+      `/api/admin/categories/${row.id}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: row.status === 'active' ? 'inactive' : 'active' })
+      },
+      { successMessage: row.status === 'active' ? 'Category deactivated' : 'Category activated' }
+    )
     await loadMains()
     await table.reload()
   }
@@ -208,7 +214,16 @@ const CategoryManager = () => {
                 <IconButton size='small' onClick={() => openEdit(row)}>
                   <i className='tabler-edit' />
                 </IconButton>
-                <IconButton size='small' color='error' onClick={() => void remove(row.id)}>
+                <IconButton
+                  size='small'
+                  color='error'
+                  onClick={() =>
+                    askDelete({
+                      name: row.name,
+                      onConfirm: () => void remove(row.id)
+                    })
+                  }
+                >
                   <i className='tabler-trash' />
                 </IconButton>
               </>
@@ -248,6 +263,7 @@ const CategoryManager = () => {
         }}
         onSelect={onPick}
       />
+      {confirmDialog}
     </>
   )
 }

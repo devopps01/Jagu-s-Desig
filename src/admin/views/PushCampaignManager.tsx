@@ -15,6 +15,7 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 
 import { AdminDataTable, useServerTable } from '@admin/components/table'
+import { adminApi } from '@admin/libs/adminApi'
 
 type CampaignRow = {
   id: string
@@ -49,25 +50,27 @@ const PushCampaignManager = () => {
 
   const save = async (sendAfter = false) => {
     setError('')
-    const res = await fetch('/api/admin/push-campaigns', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form)
-    })
-    const json = await res.json()
+    const result = await adminApi<{ id?: string }>(
+      '/api/admin/push-campaigns',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form)
+      },
+      { successMessage: sendAfter ? false : 'Campaign saved as draft' }
+    )
 
-    if (!res.ok) {
-      setError(json.message || 'Could not save campaign')
+    if (!result.ok) {
+      setError(result.message || 'Could not save campaign')
 
       return
     }
 
-    if (sendAfter && json.id) {
-      const sendRes = await fetch(`/api/admin/push-campaigns/${json.id}`, { method: 'POST' })
-      const sendJson = await sendRes.json()
+    if (sendAfter && result.data.id) {
+      const sendResult = await adminApi(`/api/admin/push-campaigns/${result.data.id}`, { method: 'POST' }, { successMessage: 'Campaign sent' })
 
-      if (!sendRes.ok) {
-        setError(sendJson.message || 'Saved, but send failed. Add FIREBASE_SERVICE_ACCOUNT in .env.')
+      if (!sendResult.ok) {
+        setError(sendResult.message || 'Saved, but send failed. Add FIREBASE_SERVICE_ACCOUNT in .env.')
         await table.reload()
 
         return
@@ -81,13 +84,12 @@ const PushCampaignManager = () => {
 
   const sendExisting = async (id: string) => {
     setSending(id)
-    const res = await fetch(`/api/admin/push-campaigns/${id}`, { method: 'POST' })
-    const json = await res.json()
+    const result = await adminApi(`/api/admin/push-campaigns/${id}`, { method: 'POST' }, { successMessage: 'Campaign sent' })
 
     setSending('')
 
-    if (!res.ok) {
-      setError(json.message || 'Send failed')
+    if (!result.ok) {
+      setError(result.message || 'Send failed')
 
       return
     }

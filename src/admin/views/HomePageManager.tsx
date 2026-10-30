@@ -16,6 +16,7 @@ import ToggleButton from '@mui/material/ToggleButton'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import Typography from '@mui/material/Typography'
 
+import { adminApi } from '@admin/libs/adminApi'
 import ConfirmActionDialog from '@admin/views/ConfirmActionDialog'
 import ContactPageEditor from '@admin/views/ContactPageEditor'
 import ContentPageEditor from '@admin/views/ContentPageEditor'
@@ -629,18 +630,24 @@ const HomePageManager = () => {
     })
   }
 
-  const saveContactSettings = async () => {
-    const res = await fetch('/api/admin/contact-settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(contactSettings)
-    })
-    const json = await res.json()
+  const saveContactSettings = async (toastSuccess = true) => {
+    const result = await adminApi(
+      '/api/admin/contact-settings',
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(contactSettings)
+      },
+      {
+        successMessage: toastSuccess ? 'Contact details saved' : false,
+        errorMessage: 'Could not save contact details'
+      }
+    )
 
-    if (!res.ok) throw new Error(json.message || 'Could not save contact details')
+    if (!result.ok) throw new Error(result.message || 'Could not save contact details')
 
-    setContactSettings({ ...defaultContactSettings, ...json })
-    return json
+    setContactSettings({ ...defaultContactSettings, ...(result.data as object) })
+    return result.data
   }
 
   const save = async () => {
@@ -649,39 +656,54 @@ const HomePageManager = () => {
     setMessage('')
 
     if (activePage.kind === 'theme') {
-      try {
-        const res = await fetch('/api/admin/site-theme', {
+      const result = await adminApi(
+        '/api/admin/site-theme',
+        {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(themeSettings)
-        })
-        const json = await res.json()
+        },
+        { successMessage: 'Theme saved', errorMessage: 'Could not save theme' }
+      )
 
-        if (!res.ok) throw new Error(json.message || 'Could not save theme')
+      setSaving(false)
 
-        setThemeSettings({ ...defaultSiteThemeSettings(), ...json })
-        setSaving(false)
-        setMessage('Theme saved. Logo, colours and fonts are updated on the website.')
-      } catch (err) {
-        setSaving(false)
-        setError(err instanceof Error ? err.message : 'Could not save')
+      if (!result.ok) {
+        setError(result.message || 'Could not save')
+
+        return
       }
+
+      setThemeSettings({ ...defaultSiteThemeSettings(), ...(result.data as object) })
+      setMessage('Theme saved. Logo, colours and fonts are updated on the website.')
+
       return
     }
 
     if (activePage.kind === 'header' || activePage.kind === 'footer') {
-      try {
-        const chromeRes = await fetch('/api/admin/site-chrome', {
+      const chromeRes = await adminApi(
+        '/api/admin/site-chrome',
+        {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(chromeSettings)
-        })
-        const chromeJson = await chromeRes.json()
+        },
+        {
+          successMessage: activePage.kind === 'header' ? 'Header saved' : 'Footer saved',
+          errorMessage: 'Could not save header/footer'
+        }
+      )
 
-        if (!chromeRes.ok) throw new Error(chromeJson.message || 'Could not save header/footer')
+      if (!chromeRes.ok) {
+        setSaving(false)
+        setError(chromeRes.message || 'Could not save')
 
-        await saveContactSettings()
-        setChromeSettings(mergeSiteChromeSettings(chromeJson))
+        return
+      }
+
+      try {
+        await saveContactSettings(false)
+        setChromeSettings(mergeSiteChromeSettings(chromeRes.data as SiteChromeSettings))
         setSaving(false)
         setMessage(
           activePage.kind === 'header'
@@ -692,50 +714,67 @@ const HomePageManager = () => {
         setSaving(false)
         setError(err instanceof Error ? err.message : 'Could not save')
       }
+
       return
     }
 
     if (activePage.kind === 'contact') {
       try {
-        await saveContactSettings()
+        await saveContactSettings(true)
         setSaving(false)
         setMessage('Contact page saved. Header WhatsApp, footer and Contact Us now use these details.')
       } catch (err) {
         setSaving(false)
         setError(err instanceof Error ? err.message : 'Could not save contact page')
       }
+
       return
     }
 
     if (activePage.kind === 'content') {
-      const res = await fetch('/api/admin/content-page', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...contentSettings, page: pageId })
-      })
-      const json = await res.json()
+      const result = await adminApi(
+        '/api/admin/content-page',
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...contentSettings, page: pageId })
+        },
+        { successMessage: `${activePage.label} page saved`, errorMessage: 'Could not save page' }
+      )
+
       setSaving(false)
-      if (!res.ok) {
-        setError(json.message || 'Could not save page')
+
+      if (!result.ok) {
+        setError(result.message || 'Could not save page')
+
         return
       }
-      setContentSettings(json)
+
+      setContentSettings(result.data as typeof contentSettings)
       setMessage(`${activePage.label} page saved.`)
+
       return
     }
 
-    const res = await fetch('/api/admin/home-page', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings)
-    })
-    const json = await res.json()
+    const result = await adminApi(
+      '/api/admin/home-page',
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+      },
+      { successMessage: 'Home page saved', errorMessage: 'Could not save home page' }
+    )
+
     setSaving(false)
-    if (!res.ok) {
-      setError(json.message || 'Could not save home page')
+
+    if (!result.ok) {
+      setError(result.message || 'Could not save home page')
+
       return
     }
-    setSettings(json)
+
+    setSettings(result.data as typeof settings)
     setMessage('Home page saved.')
   }
 

@@ -15,6 +15,8 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 
 import { AdminDataTable, useServerTable } from '@admin/components/table'
+import { useConfirmDelete } from '@admin/hooks/useConfirmDelete'
+import { adminApi, adminMutate } from '@admin/libs/adminApi'
 import { formatPrice } from '@web/data/catalog'
 import type { OfferType } from '@/libs/offers'
 
@@ -57,6 +59,7 @@ const toLocalInput = (value?: string | null) => {
 }
 
 const DiscountManager = () => {
+  const { askDelete, confirmDialog } = useConfirmDelete()
   const [statusFilter, setStatusFilter] = useState('')
   const extraParams = useMemo(() => ({ status: statusFilter }), [statusFilter])
   const table = useServerTable<DiscountRow>('/api/admin/discounts', { extraParams })
@@ -77,15 +80,14 @@ const DiscountManager = () => {
       endsAt: form.endsAt || null,
       status: form.status
     }
-    const res = await fetch(form.id ? `/api/admin/discounts/${form.id}` : '/api/admin/discounts', {
+    const result = await adminApi(form.id ? `/api/admin/discounts/${form.id}` : '/api/admin/discounts', {
       method: form.id ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
-    })
-    const json = await res.json()
+    }, { successMessage: form.id ? 'Discount updated' : 'Discount saved' })
 
-    if (!res.ok) {
-      setError(json.message || 'Save failed')
+    if (!result.ok) {
+      setError(result.message || 'Save failed')
 
       return
     }
@@ -165,11 +167,16 @@ const DiscountManager = () => {
                 size='small'
                 checked={row.status === 'active'}
                 onChange={() =>
-                  void fetch(`/api/admin/discounts/${row.id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: row.status === 'active' ? 'inactive' : 'active' })
-                  }).then(() => table.reload())
+                  void adminMutate(
+                    `/api/admin/discounts/${row.id}`,
+                    {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ status: row.status === 'active' ? 'inactive' : 'active' })
+                    },
+                    { successMessage: 'Discount status updated' },
+                    () => table.reload()
+                  )
                 }
               />
             )
@@ -200,7 +207,21 @@ const DiscountManager = () => {
                 >
                   <i className='tabler-edit' />
                 </IconButton>
-                <IconButton size='small' onClick={() => void fetch(`/api/admin/discounts/${row.id}`, { method: 'DELETE' }).then(() => table.reload())}>
+                <IconButton
+                  size='small'
+                  onClick={() =>
+                    askDelete({
+                      name: row.code,
+                      onConfirm: () =>
+                        adminMutate(
+                          `/api/admin/discounts/${row.id}`,
+                          { method: 'DELETE' },
+                          { successMessage: 'Discount deleted' },
+                          () => table.reload()
+                        )
+                    })
+                  }
+                >
                   <i className='tabler-trash' />
                 </IconButton>
               </>
@@ -269,6 +290,7 @@ const DiscountManager = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      {confirmDialog}
     </>
   )
 }

@@ -97,7 +97,6 @@ export const invoiceHtml = (order: InvoiceOrder, kind: 'invoice' | 'slip' = 'inv
       <strong>Bill to</strong>
       <p class="muted">${order.customer.name}<br/>${order.customer.phone}${order.userEmail ? `<br/>${order.userEmail}` : ''}<br/>${address}</p>
     </div>
-    ${order.sisterName ? `<div><strong>Referral sister</strong><p class="muted">${order.sisterName}</p></div>` : ''}
   </div>
   <table>
     <thead>
@@ -109,7 +108,7 @@ export const invoiceHtml = (order: InvoiceOrder, kind: 'invoice' | 'slip' = 'inv
     ${order.productSavings ? `<p><span>Product discount</span><span>− ${money(order.productSavings)}</span></p>` : ''}
     <p><span>Item total</span><span>${money(order.subtotal)}</span></p>
     ${order.discountAmount ? `<p><span>Coupon ${order.discountCode || ''}</span><span>− ${money(order.discountAmount)}</span></p>` : ''}
-    ${order.sisterDiscountAmount ? `<p><span>Sister offer</span><span>− ${money(order.sisterDiscountAmount)}</span></p>` : ''}
+    ${order.sisterDiscountAmount ? `<p><span>Extra offer</span><span>− ${money(order.sisterDiscountAmount)}</span></p>` : ''}
     <p><span>Shipping</span><span>${order.shipping ? money(order.shipping) : 'Free'}</span></p>
     ${order.gstAmount ? `<p><span>${order.gstLabel || 'GST'}${order.gstRate ? ` (${order.gstRate}%)` : ''}</span><span>${money(order.gstAmount)}</span></p>` : ''}
     <p class="grand"><span>To pay</span><span>${money(order.total)}</span></p>

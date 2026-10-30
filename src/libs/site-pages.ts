@@ -153,7 +153,7 @@ const defaults: Record<string, () => ContentPageSettings> = {
         id: 'who',
         title: 'Who it is for',
         paragraphs:
-          'Video shopping helps when you cannot visit the Surat atelier, when you want to compare two cholis, or when a sister is choosing with you from another city.\n\nIt is also useful before a rental. You see the exact piece we will hold for your dates.'
+          'Video shopping helps when you cannot visit the Surat atelier, when you want to compare two cholis, or when someone is choosing with you from another city.\n\nIt is also useful before a rental. You see the exact piece we will hold for your dates.'
       }),
       block({
         id: 'prep',

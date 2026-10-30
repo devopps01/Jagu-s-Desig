@@ -10,6 +10,7 @@ import CardContent from '@mui/material/CardContent'
 import Grid from '@mui/material/Grid'
 import Typography from '@mui/material/Typography'
 
+import { adminApi } from '@admin/libs/adminApi'
 import ContactPageEditor from '@admin/views/ContactPageEditor'
 import { defaultContactSettings, type ContactSettings } from '@/libs/contact-types'
 
@@ -22,12 +23,11 @@ const ContactPageManager = () => {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    fetch('/api/admin/contact-settings')
-      .then(res => res.json())
-      .then(json => {
-        if (json && typeof json === 'object') setSettings({ ...defaultContactSettings, ...json })
-      })
-      .catch(() => undefined)
+    void adminApi<ContactSettings>('/api/admin/contact-settings', undefined, { silentSuccess: true }).then(result => {
+      if (result.ok && result.data && typeof result.data === 'object') {
+        setSettings({ ...defaultContactSettings, ...result.data })
+      }
+    })
   }, [])
 
   const save = async () => {
@@ -35,21 +35,24 @@ const ContactPageManager = () => {
     setMessage('')
     setError('')
 
-    const res = await fetch('/api/admin/contact-settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings)
-    })
-    const json = await res.json()
+    const result = await adminApi<ContactSettings>(
+      '/api/admin/contact-settings',
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+      },
+      { successMessage: 'Contact page saved' }
+    )
 
     setSaving(false)
 
-    if (!res.ok) {
-      setError(json.message || 'Could not save contact page')
+    if (!result.ok) {
+      setError(result.message || 'Could not save contact page')
       return
     }
 
-    setSettings({ ...defaultContactSettings, ...json })
+    setSettings({ ...defaultContactSettings, ...result.data })
     setMessage('Contact page saved. Header WhatsApp, footer and Contact Us now use these details.')
   }
 

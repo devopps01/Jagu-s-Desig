@@ -65,6 +65,7 @@ const ColorSwatch = ({ name }: { name: string }) => (
 
 export type ProductFormValue = {
   id: string
+  productNo?: number
   name: string
   slug: string
   description: string
@@ -86,6 +87,8 @@ export type ProductFormValue = {
   style: string
   styles: string[]
   sizes: string[]
+  rentSizeStock?: Record<string, number>
+  saleSizeStock?: Record<string, number>
   details: { label: string; value: string }[]
   seoTitle: string
   seoDescription: string
@@ -149,7 +152,7 @@ const ProductFormModal = ({
       }}
     >
       <DialogTitle sx={{ flexShrink: 0, px: '28px !important', pt: '24px !important', pb: '8px !important' }}>
-        {value.id ? 'Edit product' : 'Add product'}
+        {value.id ? `Edit product${value.productNo ? ` · #${value.productNo}` : ''}` : 'Add product'}
       </DialogTitle>
       <DialogContent sx={{ flex: '1 1 auto', overflowY: 'auto', padding: '16px 28px 32px !important' }}>
         {error ? <Typography color='error' sx={{ mb: 2 }}>{error}</Typography> : null}
@@ -380,29 +383,84 @@ const ProductFormModal = ({
             />
           </Grid>
           <Grid size={{ xs: 12 }}>
-            <Typography variant='subtitle1'>Sizes</Typography>
+            <Typography variant='subtitle1'>Sizes and quantity</Typography>
             <Typography variant='body2' color='text.secondary' className='mbe-2'>
-              Only the sizes you tick are shown on this product page.
+              Rent quantity and selling quantity are separate. Rent dates can be booked once for each rent piece. Leave selling quantity empty for no limit.
             </Typography>
-            <div className='flex flex-wrap gap-1'>
-              {PRODUCT_SIZES.map(item => (
-                <FormControlLabel
-                  key={item}
-                  control={
-                    <Checkbox
-                      size='small'
-                      checked={(value.sizes || []).includes(item)}
-                      onChange={event => {
-                        const current = value.sizes || []
-                        const sizes = event.target.checked ? [...current, item] : current.filter(size => size !== item)
+            <div className='flex flex-col gap-2'>
+              {PRODUCT_SIZES.map(item => {
+                const on = (value.sizes || []).includes(item)
+                const rentQty = value.rentSizeStock?.[item] || 1
+                const saleSet = value.saleSizeStock && Object.prototype.hasOwnProperty.call(value.saleSizeStock, item)
+                const showRent = value.listingType !== 'sale'
+                const showSale = value.listingType !== 'rent'
 
-                        set({ sizes })
-                      }}
+                return (
+                  <div key={item} className='flex items-center gap-3'>
+                    <FormControlLabel
+                      sx={{ minWidth: 140, m: 0 }}
+                      control={
+                        <Checkbox
+                          size='small'
+                          checked={on}
+                          onChange={event => {
+                            const current = value.sizes || []
+                            const sizes = event.target.checked ? [...current, item] : current.filter(size => size !== item)
+                            const rentSizeStock = { ...(value.rentSizeStock || {}) }
+                            const saleSizeStock = { ...(value.saleSizeStock || {}) }
+
+                            if (event.target.checked) rentSizeStock[item] = rentSizeStock[item] || 1
+                            else {
+                              delete rentSizeStock[item]
+                              delete saleSizeStock[item]
+                            }
+
+                            set({ sizes, rentSizeStock, saleSizeStock })
+                          }}
+                        />
+                      }
+                      label={item}
                     />
-                  }
-                  label={item}
-                />
-              ))}
+                    {showRent ? (
+                      <TextField
+                        type='number'
+                        size='small'
+                        label='Rent qty'
+                        disabled={!on}
+                        value={on ? rentQty : ''}
+                        onChange={event => {
+                          const next = Math.max(1, Math.min(99, Math.floor(Number(event.target.value) || 1)))
+
+                          set({ rentSizeStock: { ...(value.rentSizeStock || {}), [item]: next } })
+                        }}
+                        slotProps={{ htmlInput: { min: 1, max: 99 } }}
+                        sx={{ width: 110 }}
+                      />
+                    ) : null}
+                    {showSale ? (
+                      <TextField
+                        type='number'
+                        size='small'
+                        label='Selling qty'
+                        placeholder='No limit'
+                        disabled={!on}
+                        value={on && saleSet ? value.saleSizeStock?.[item] : ''}
+                        onChange={event => {
+                          const saleSizeStock = { ...(value.saleSizeStock || {}) }
+                          const raw = event.target.value
+
+                          if (raw === '') delete saleSizeStock[item]
+                          else saleSizeStock[item] = Math.max(0, Math.min(99, Math.floor(Number(raw) || 0)))
+
+                          set({ saleSizeStock })
+                        }}
+                        slotProps={{ htmlInput: { min: 0, max: 99 } }}
+                        sx={{ width: 130 }}
+                      />
+                    ) : null}
+                  </div>
+                )
+              })}
             </div>
           </Grid>
           <Grid size={{ xs: 12 }}>

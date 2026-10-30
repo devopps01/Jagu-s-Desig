@@ -13,6 +13,7 @@ import Switch from '@mui/material/Switch'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 
+import { adminApi } from '@admin/libs/adminApi'
 import ImageDropCard from '@admin/views/ImageDropCard'
 import MediaPickerModal, { type PickedMedia } from '@admin/views/MediaPickerModal'
 import { defaultNewsletterSettings, type NewsletterSettings } from '@/libs/newsletter-types'
@@ -28,10 +29,9 @@ const NewsletterSettingsManager = () => {
   const [pendingFile, setPendingFile] = useState<File | null>(null)
 
   const load = async () => {
-    const res = await fetch('/api/admin/newsletter-settings')
-    const json = await res.json()
+    const result = await adminApi<NewsletterSettings>('/api/admin/newsletter-settings', undefined, { silentSuccess: true })
 
-    if (res.ok) setSettings({ ...defaultNewsletterSettings, ...json })
+    if (result.ok) setSettings({ ...defaultNewsletterSettings, ...result.data })
   }
 
   useEffect(() => {
@@ -43,22 +43,25 @@ const NewsletterSettingsManager = () => {
     setMessage('')
     setError('')
 
-    const res = await fetch('/api/admin/newsletter-settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings)
-    })
-    const json = await res.json()
+    const result = await adminApi<NewsletterSettings>(
+      '/api/admin/newsletter-settings',
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+      },
+      { successMessage: 'Newsletter settings saved' }
+    )
 
     setSaving(false)
 
-    if (!res.ok) {
-      setError(json.message || 'Could not save newsletter settings')
+    if (!result.ok) {
+      setError(result.message || 'Could not save newsletter settings')
 
       return
     }
 
-    setSettings({ ...defaultNewsletterSettings, ...json })
+    setSettings({ ...defaultNewsletterSettings, ...result.data })
     setMessage('Newsletter settings saved. It shows at the top of the site footer.')
   }
 

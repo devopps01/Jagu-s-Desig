@@ -18,6 +18,8 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 
 import { AdminDataTable, useServerTable } from '@admin/components/table'
+import { useConfirmDelete } from '@admin/hooks/useConfirmDelete'
+import { adminApi, adminMutate } from '@admin/libs/adminApi'
 import { formatPrice } from '@web/data/catalog'
 import type { OfferType } from '@/libs/offers'
 
@@ -84,6 +86,7 @@ const sisterShareUrl = (code: string) => {
 }
 
 const ReferralSisterManager = () => {
+  const { askDelete, confirmDialog } = useConfirmDelete()
   const [statusFilter, setStatusFilter] = useState('')
   const extraParams = useMemo(() => ({ status: statusFilter }), [statusFilter])
   const table = useServerTable<SisterRow>('/api/admin/referral-sisters', { extraParams })
@@ -96,10 +99,9 @@ const ReferralSisterManager = () => {
   const [detail, setDetail] = useState<{ sister: SisterRow; orders: SisterOrder[] } | null>(null)
 
   const loadStats = async () => {
-    const res = await fetch('/api/admin/referral-sisters/stats')
-    const json = await res.json()
+    const result = await adminApi<Stats>('/api/admin/referral-sisters/stats', undefined, { silentSuccess: true })
 
-    if (res.ok) setStats({ ...emptyStats, ...json })
+    if (result.ok) setStats({ ...emptyStats, ...result.data })
   }
 
   useEffect(() => {
@@ -116,24 +118,27 @@ const ReferralSisterManager = () => {
     setError('')
     setSaving(true)
 
-    const res = await fetch(form.id ? `/api/admin/referral-sisters/${form.id}` : '/api/admin/referral-sisters', {
-      method: form.id ? 'PUT' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: form.name,
-        code: form.code,
-        phone: form.phone,
-        type: form.type,
-        value: Number(form.value) || 0,
-        status: form.status
-      })
-    })
-    const json = await res.json()
+    const result = await adminApi<SisterRow>(
+      form.id ? `/api/admin/referral-sisters/${form.id}` : '/api/admin/referral-sisters',
+      {
+        method: form.id ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          code: form.code,
+          phone: form.phone,
+          type: form.type,
+          value: Number(form.value) || 0,
+          status: form.status
+        })
+      },
+      { successMessage: form.id ? 'Sister updated' : 'Sister added' }
+    )
 
     setSaving(false)
 
-    if (!res.ok) {
-      setError(json.message || 'Save failed')
+    if (!result.ok) {
+      setError(result.message || 'Save failed')
 
       return
     }
@@ -145,10 +150,11 @@ const ReferralSisterManager = () => {
   }
 
   const openOrders = async (id: string) => {
-    const res = await fetch(`/api/admin/referral-sisters/${id}`)
-    const json = await res.json()
+    const result = await adminApi<{ sister: SisterRow; orders: SisterOrder[] }>(`/api/admin/referral-sisters/${id}`, undefined, {
+      silentSuccess: true
+    })
 
-    if (res.ok) setDetail(json)
+    if (result.ok) setDetail(result.data)
   }
 
   const cards = [
@@ -324,14 +330,19 @@ const ReferralSisterManager = () => {
                   size='small'
                   checked={row.status === 'active'}
                   onChange={() =>
-                    void fetch(`/api/admin/referral-sisters/${row.id}`, {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ status: row.status === 'active' ? 'inactive' : 'active' })
-                    }).then(() => {
-                      void table.reload()
-                      void loadStats()
-                    })
+                    void adminMutate(
+                      `/api/admin/referral-sisters/${row.id}`,
+                      {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status: row.status === 'active' ? 'inactive' : 'active' })
+                      },
+                      { successMessage: 'Sister updated' },
+                      async () => {
+                        await table.reload()
+                        await loadStats()
+                      }
+                    )
                   }
                 />
               )
@@ -376,9 +387,18 @@ const ReferralSisterManager = () => {
                     size='small'
                     aria-label='Delete sister'
                     onClick={() =>
-                      void fetch(`/api/admin/referral-sisters/${row.id}`, { method: 'DELETE' }).then(() => {
-                        void table.reload()
-                        void loadStats()
+                      askDelete({
+                        name: row.name,
+                        onConfirm: () =>
+                          adminMutate(
+                            `/api/admin/referral-sisters/${row.id}`,
+                            { method: 'DELETE' },
+                            { successMessage: 'Sister deleted' },
+                            async () => {
+                              await table.reload()
+                              await loadStats()
+                            }
+                          )
                       })
                     }
                   >
@@ -481,6 +501,7 @@ const ReferralSisterManager = () => {
           <Button onClick={() => setDetail(null)}>Close</Button>
         </DialogActions>
       </Dialog>
+      {confirmDialog}
     </Grid>
   )
 }

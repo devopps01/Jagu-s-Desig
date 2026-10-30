@@ -18,6 +18,8 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 
 import { AdminDataTable, useServerTable } from '@admin/components/table'
+import { useConfirmDelete } from '@admin/hooks/useConfirmDelete'
+import { adminMutate } from '@admin/libs/adminApi'
 import { type ContactStatus } from '@/libs/contact-types'
 
 type ContactRow = {
@@ -49,6 +51,7 @@ const statusColor = (status: ContactStatus) => {
 }
 
 const ContactManager = () => {
+  const { askDelete, confirmDialog } = useConfirmDelete()
   const params = useParams()
   const lang = String(params?.lang || 'en')
   const [statusFilter, setStatusFilter] = useState('')
@@ -69,11 +72,15 @@ const ContactManager = () => {
   }, [table.rows])
 
   const patch = async (id: string, status: ContactStatus) => {
-    await fetch(`/api/admin/contacts/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status })
-    })
+    await adminMutate(
+      `/api/admin/contacts/${id}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      },
+      { successMessage: 'Inquiry updated' }
+    )
     setOpen(current => (current?.id === id ? { ...current, status } : current))
     await table.reload()
     await loadExtras()
@@ -201,7 +208,18 @@ const ContactManager = () => {
                   <IconButton
                     size='small'
                     title='Delete'
-                    onClick={() => void fetch(`/api/admin/contacts/${row.id}`, { method: 'DELETE' }).then(() => table.reload())}
+                    onClick={() =>
+                      askDelete({
+                        name: row.subject || row.name,
+                        onConfirm: () =>
+                          adminMutate(
+                            `/api/admin/contacts/${row.id}`,
+                            { method: 'DELETE' },
+                            { successMessage: 'Inquiry deleted' },
+                            () => table.reload()
+                          )
+                      })
+                    }
                   >
                     <i className='tabler-trash' />
                   </IconButton>
@@ -239,6 +257,7 @@ const ContactManager = () => {
           <Button onClick={() => setOpen(null)}>Close</Button>
         </DialogActions>
       </Dialog>
+      {confirmDialog}
     </Grid>
   )
 }

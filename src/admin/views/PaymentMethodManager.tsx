@@ -14,6 +14,8 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 
 import { AdminDataTable, useServerTable } from '@admin/components/table'
+import { useConfirmDelete } from '@admin/hooks/useConfirmDelete'
+import { adminApi, adminMutate } from '@admin/libs/adminApi'
 import {
   PAYMENT_METHOD_TYPES,
   paymentMethodIcon,
@@ -34,6 +36,7 @@ const emptyForm = {
 }
 
 const PaymentMethodManager = () => {
+  const { askDelete, confirmDialog } = useConfirmDelete()
   const [statusFilter, setStatusFilter] = useState('')
   const extraParams = useMemo(() => ({ status: statusFilter }), [statusFilter])
   const table = useServerTable<PaymentMethod>('/api/admin/payment-methods', { extraParams })
@@ -60,15 +63,18 @@ const PaymentMethodManager = () => {
       sortOrder: Number(form.sortOrder) || 0,
       status: form.status
     }
-    const res = await fetch(form.id ? `/api/admin/payment-methods/${form.id}` : '/api/admin/payment-methods', {
-      method: form.id ? 'PUT' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-    const json = await res.json()
+    const result = await adminApi(
+      form.id ? `/api/admin/payment-methods/${form.id}` : '/api/admin/payment-methods',
+      {
+        method: form.id ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      },
+      { successMessage: form.id ? 'Payment method updated' : 'Payment method saved' }
+    )
 
-    if (!res.ok) {
-      setError(json.message || 'Save failed')
+    if (!result.ok) {
+      setError(result.message || 'Save failed')
 
       return
     }
@@ -144,11 +150,16 @@ const PaymentMethodManager = () => {
                 size='small'
                 checked={row.status === 'active'}
                 onChange={() =>
-                  void fetch(`/api/admin/payment-methods/${row.id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: row.status === 'active' ? 'inactive' : 'active' })
-                  }).then(() => table.reload())
+                  void adminMutate(
+                    `/api/admin/payment-methods/${row.id}`,
+                    {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ status: row.status === 'active' ? 'inactive' : 'active' })
+                    },
+                    { successMessage: 'Payment method status updated' },
+                    () => table.reload()
+                  )
                 }
               />
             )
@@ -178,7 +189,18 @@ const PaymentMethodManager = () => {
                 </IconButton>
                 <IconButton
                   size='small'
-                  onClick={() => void fetch(`/api/admin/payment-methods/${row.id}`, { method: 'DELETE' }).then(() => table.reload())}
+                  onClick={() =>
+                    askDelete({
+                      name: row.title,
+                      onConfirm: () =>
+                        adminMutate(
+                          `/api/admin/payment-methods/${row.id}`,
+                          { method: 'DELETE' },
+                          { successMessage: 'Payment method deleted' },
+                          () => table.reload()
+                        )
+                    })
+                  }
                 >
                   <i className='tabler-trash' />
                 </IconButton>
@@ -259,6 +281,7 @@ const PaymentMethodManager = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      {confirmDialog}
     </>
   )
 }

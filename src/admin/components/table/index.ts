@@ -1,5 +1,8 @@
 export { default as AdminDataTable } from './AdminDataTable'
+export { default as AdminTableActions } from './AdminTableActions'
 export { default as DataTable } from './DataTable'
 export { default as TableToolbar } from './TableToolbar'
+export { useClientTable } from './useClientTable'
 export { useServerTable } from './useServerTable'
+export { adminActionsColumn } from './types'
 export type { DataTableColumn, DataTableMeta } from './types'

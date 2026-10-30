@@ -8,10 +8,41 @@ export type StoreMenuLink = {
 export type StoreMenuGroup = {
   label: string
   icon: string
+  href?: string
   items: StoreMenuLink[]
 }
 
 export const STORE_MENU_GROUPS: StoreMenuGroup[] = [
+  {
+    label: 'Dashboard',
+    icon: 'tabler-layout-dashboard',
+    href: '/store/dashboard',
+    items: [{ label: 'Main dashboard', href: '/store/dashboard' }]
+  },
+  {
+    label: 'Rent',
+    icon: 'tabler-calendar-check',
+    items: [
+      { label: 'Dashboard', href: '/store/rentals/dashboard' },
+      { label: 'Availability', href: '/store/rentals/availability' },
+      { label: 'Book rent', href: '/store/rentals/book' },
+      { label: 'Rent store', href: '/store/rentals' },
+      { label: 'Dress care', href: '/store/rentals/dress-care' },
+      { label: 'Rent customers', href: '/store/rentals/customers' },
+      { label: 'Rent inventory', href: '/store/inventory/rent' }
+    ]
+  },
+  {
+    label: 'Selling',
+    icon: 'tabler-shopping-bag',
+    items: [
+      { label: 'Dashboard', href: '/store/sales/dashboard' },
+      { label: 'Sell outfit', href: '/store/sales/book' },
+      { label: 'Sale store', href: '/store/sales' },
+      { label: 'Sale customers', href: '/store/sales/customers' },
+      { label: 'Selling inventory', href: '/store/inventory/selling' }
+    ]
+  },
   {
     label: 'Customers',
     icon: 'tabler-users',
@@ -37,8 +68,7 @@ export const STORE_MENU_GROUPS: StoreMenuGroup[] = [
     icon: 'tabler-file-invoice',
     items: [
       { label: 'Orders & billing', href: '/store/orders' },
-      { label: 'Cancel & returns', href: '/store/order-requests' },
-      { label: 'Rent bookings', href: '/store/rentals' }
+      { label: 'Cancel & returns', href: '/store/order-requests' }
     ]
   },
   {
@@ -46,7 +76,6 @@ export const STORE_MENU_GROUPS: StoreMenuGroup[] = [
     icon: 'tabler-discount',
     items: [
       { label: 'Discounts', href: '/store/discounts' },
-      { label: 'Referral sisters', href: '/store/referral-sisters' },
       { label: 'Payment methods', href: '/store/payments' },
       { label: 'GST settings', href: '/store/gst' }
     ]
@@ -72,6 +101,7 @@ export const STORE_MENU_GROUPS: StoreMenuGroup[] = [
     icon: 'tabler-world',
     items: [
       { label: 'Website editor', href: '/store/home-page' },
+      { label: 'Blog', href: '/store/blog' },
       { label: 'Contact page', href: '/store/contact-page' },
       { label: 'Contact inquiries', href: '/store/contact' },
       { label: 'Newsletter banner', href: '/store/newsletter' },
@@ -90,4 +120,4 @@ export const STORE_SEARCH_ENTRIES = STORE_MENU_GROUPS.flatMap((group, groupIndex
   }))
 )
 
-export const STORE_HOME_PATH = '/store/home-page'
+export const STORE_HOME_PATH = '/store/dashboard'

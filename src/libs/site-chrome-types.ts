@@ -37,6 +37,7 @@ export const defaultFooterPolicyLinks = (): FooterLink[] => [
 
 export const defaultFooterInfoLinks = (): FooterLink[] => [
   createFooterLink({ id: 'info-about', label: 'About us', href: '/about' }),
+  createFooterLink({ id: 'info-blog', label: 'Blog', href: '/blog' }),
   createFooterLink({ id: 'info-video', label: 'Video Shopping', href: '/video' }),
   createFooterLink({ id: 'info-track', label: 'Track Order', href: '/track-order' }),
   createFooterLink({ id: 'info-account', label: 'My account', href: '__account__' })

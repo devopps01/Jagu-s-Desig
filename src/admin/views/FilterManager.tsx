@@ -17,7 +17,8 @@ import Switch from '@mui/material/Switch'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 
-import { AdminDataTable } from '@admin/components/table'
+import { AdminDataTable, useClientTable } from '@admin/components/table'
+import { adminApi } from '@admin/libs/adminApi'
 import type { FilterDoc, FilterOption } from '@/libs/filter-utils'
 
 const emptyOption = (isPrice: boolean): FilterOption =>
@@ -31,10 +32,12 @@ const FilterManager = () => {
 
   const load = async () => {
     setLoading(true)
-    const res = await fetch('/api/admin/filters')
-    const json = await res.json()
+    const result = await adminApi<FilterDoc[]>('/api/admin/filters', undefined, {
+      silentSuccess: true,
+      errorMessage: 'Could not load filters'
+    })
 
-    setRows(Array.isArray(json) ? json : [])
+    setRows(result.ok && Array.isArray(result.data) ? result.data : [])
     setLoading(false)
   }
 
@@ -42,12 +45,20 @@ const FilterManager = () => {
     void load()
   }, [])
 
+  const table = useClientTable(rows, {
+    getSearchText: row => `${row.label} ${row.key}`
+  })
+
   const save = async (key: string, payload: Partial<FilterDoc>) => {
-    await fetch(`/api/admin/filters/${key}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
+    await adminApi(
+      `/api/admin/filters/${key}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      },
+      { successMessage: 'Filter saved' }
+    )
     await load()
   }
 
@@ -66,9 +77,9 @@ const FilterManager = () => {
       <AdminDataTable
         title='Collection filters'
         subtitle='Choose which filters appear on collection pages, and whether options come from products or a static list.'
-        search=''
+        search={table.search}
         searchPlaceholder='Search filters...'
-        onSearchChange={() => undefined}
+        onSearchChange={table.setSearch}
         onRefresh={() => void load()}
         columns={[
           { id: 'label', label: 'Filter' },
@@ -116,15 +127,15 @@ const FilterManager = () => {
             )
           }
         ]}
-        rows={rows}
+        rows={table.rows}
         rowKey={row => row.key}
-        total={rows.length}
-        page={1}
-        limit={20}
+        total={table.total}
+        page={table.page}
+        limit={table.limit}
         loading={loading}
         emptyText='No filters yet.'
-        onPageChange={() => undefined}
-        onLimitChange={() => undefined}
+        onPageChange={table.setPage}
+        onLimitChange={table.setLimit}
       />
 
       <Dialog open={Boolean(edit)} onClose={() => setEdit(null)} fullWidth maxWidth='sm'>

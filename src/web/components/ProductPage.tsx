@@ -17,7 +17,7 @@ import ProductDealBanner from '@web/components/ProductDealBanner'
 import ProductInfoTabs from '@web/components/ProductInfoTabs'
 import HomeFeatures from '@web/components/HomeFeatures'
 import { ExchangeIcon, GlobalIcon, HandmadeIcon, ShippingIcon } from '@web/components/BuyAssureIcons'
-import { productSizes } from '@/libs/rent-sizes'
+import { isSizeOutOfStock, productSizes, salePiecesLeft } from '@/libs/rent-sizes'
 import { getViewedSlugs, rememberViewed } from '@web/lib/recently-viewed'
 import { storeWhatsAppHref } from '@/libs/contact-types'
 
@@ -75,11 +75,21 @@ const ProductPage = ({ slug, initialProduct }: { slug: string; initialProduct?: 
   }
 
   const chosenSize = size === 'Custom' ? (customSize.trim() ? `Custom · ${customSize.trim()}` : '') : size
-  const cartOptions = { size: chosenSize, qty }
+  const saleLeft = product.listingType === 'rent' ? null : salePiecesLeft(product, size)
+  const markedOut = product.listingType !== 'rent' && isSizeOutOfStock(product.saleOutOfStock, size)
+  const soldOut = markedOut || saleLeft === 0
+  const maxQty = saleLeft === null ? 20 : Math.max(0, saleLeft)
+  const cartOptions = { size: chosenSize, qty: saleLeft === null ? qty : Math.min(qty, Math.max(1, saleLeft)) }
 
   const addToBag = (openCheckout = false) => {
     if (size === 'Custom' && !customSize.trim()) {
       setSizeError('Write your measurements, for example bust 36, waist 30, hip 40.')
+
+      return
+    }
+
+    if (soldOut) {
+      setSizeError(`Size ${size} is sold out.`)
 
       return
     }
@@ -158,12 +168,31 @@ const ProductPage = ({ slug, initialProduct }: { slug: string; initialProduct?: 
               </button>
             </div>
             <div className='vn-size-row is-chart'>
-              {productSizes(product.sizes).map(item => (
-                <button key={item} type='button' className={size === item ? 'is-on' : ''} onClick={() => setSize(item)}>
-                  {item}
-                </button>
-              ))}
+              {productSizes(product.sizes).map(item => {
+                const left = product.listingType === 'rent' ? null : salePiecesLeft(product, item)
+                const itemOut = product.listingType !== 'rent' && (isSizeOutOfStock(product.saleOutOfStock, item) || left === 0)
+
+                return (
+                  <button
+                    key={item}
+                    type='button'
+                    className={`${size === item ? 'is-on' : ''}${itemOut ? ' is-out' : ''}`}
+                    disabled={itemOut}
+                    onClick={() => {
+                      setSize(item)
+                      if (left !== null && left > 0) setQty(current => Math.min(current, left))
+                    }}
+                  >
+                    {item}
+                  </button>
+                )
+              })}
             </div>
+            {product.listingType === 'rent' ? null : soldOut ? (
+              <p className='vn-size-left'>Out of stock in size {size}.</p>
+            ) : saleLeft !== null ? (
+              <p className='vn-size-left'>{saleLeft} left to sell in size {size}.</p>
+            ) : null}
             {size === 'Custom' ? (
               <label className='vn-field vn-custom-size'>
                 <span>Custom size</span>
@@ -188,7 +217,7 @@ const ProductPage = ({ slug, initialProduct }: { slug: string; initialProduct?: 
                   −
                 </button>
                 <span>{qty}</span>
-                <button type='button' aria-label='Increase quantity' onClick={() => setQty(current => Math.min(20, current + 1))}>
+                <button type='button' aria-label='Increase quantity' disabled={soldOut || qty >= maxQty} onClick={() => setQty(current => Math.min(maxQty, current + 1))}>
                   +
                 </button>
               </div>
@@ -212,15 +241,11 @@ const ProductPage = ({ slug, initialProduct }: { slug: string; initialProduct?: 
           </div>
 
           <div className='vn-product-actions'>
-            <button className='vn-btn vn-btn-outline' type='button' onClick={() => addToBag()}>
-              Add to cart
+            <button className='vn-btn vn-btn-outline' type='button' disabled={soldOut} onClick={() => addToBag()}>
+              {soldOut ? 'Out of stock' : 'Add to cart'}
             </button>
-            <button
-              className='vn-btn vn-btn-solid'
-              type='button'
-              onClick={() => addToBag(true)}
-            >
-              Buy now
+            <button className='vn-btn vn-btn-solid' type='button' disabled={soldOut} onClick={() => addToBag(true)}>
+              {soldOut ? 'Out of stock' : 'Buy now'}
             </button>
           </div>
 

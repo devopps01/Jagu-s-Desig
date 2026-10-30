@@ -26,10 +26,11 @@ type AdminDataTableProps<T> = {
   emptyText?: string
   onPageChange: (page: number) => void
   onLimitChange: (limit: number) => void
+  hideSearch?: boolean
 }
 
 const AdminDataTable = <T,>(props: AdminDataTableProps<T>) => (
-  <Card>
+  <Card sx={{ overflow: 'hidden' }}>
     <TableToolbar
       title={props.title}
       subtitle={props.subtitle}
@@ -38,6 +39,7 @@ const AdminDataTable = <T,>(props: AdminDataTableProps<T>) => (
       onSearchChange={props.onSearchChange}
       onRefresh={props.onRefresh}
       actions={props.actions}
+      hideSearch={props.hideSearch}
     />
     <DataTable
       columns={props.columns}

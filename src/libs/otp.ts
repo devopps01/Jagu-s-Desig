@@ -30,6 +30,8 @@ export type WebUserAddress = {
 export type WebUserDoc = {
   _id: ObjectId
   email: string
+  name?: string
+  phone?: string
   referralCode?: string
   addresses?: WebUserAddress[]
   lastLoginAt: Date | null
@@ -152,10 +154,32 @@ export const getWebUserProfile = async (id: string) => {
   return {
     id: user._id.toHexString(),
     email: user.email,
+    name: String(user.name || ''),
+    phone: String(user.phone || ''),
     referralCode,
     addresses: Array.isArray(user.addresses) ? user.addresses : [],
     createdAt: user.createdAt
   }
+}
+
+export const updateWebUserContact = async (id: string, input: { name?: string; phone?: string }) => {
+  if (!ObjectId.isValid(id)) throw new Error('Please log in again')
+
+  const name = String(input.name || '').trim()
+  const phone = String(input.phone || '').trim()
+
+  if (!name) throw new Error('Name is required')
+  if (!phone) throw new Error('Phone is required')
+
+  const db = await getDb()
+  const result = await db.collection('WebUser').updateOne(
+    { _id: new ObjectId(id) },
+    { $set: { name, phone, updatedAt: new Date() } }
+  )
+
+  if (!result.matchedCount) throw new Error('Account not found')
+
+  return getWebUserProfile(id)
 }
 
 export const listWebUsers = async (query?: TableQuery) => {

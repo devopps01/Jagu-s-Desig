@@ -168,7 +168,7 @@ export const defaultContactSettings: ContactSettings = {
       id: 'help-custom',
       icon: 'tabler-needle',
       title: 'Custom & rental',
-      copy: 'Ask for a made-to-measure piece, a Navratri rental, or a sister referral offer.'
+      copy: 'Ask for a made-to-measure piece, a Navratri rental, or styling help.'
     })
   ],
   topicsNote: 'Quality · Security · Care',

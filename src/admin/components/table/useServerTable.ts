@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
+import { adminApi } from '@admin/libs/adminApi'
 import type { TableResponse } from '@/libs/table-query'
 
 type UseServerTableOptions = {
@@ -24,6 +25,8 @@ export const useServerTable = <T,>(endpoint: string, options: UseServerTableOpti
     return () => clearTimeout(timer)
   }, [search])
 
+  const extraKey = JSON.stringify(options.extraParams || {})
+
   const reload = useCallback(async () => {
     setLoading(true)
 
@@ -32,21 +35,24 @@ export const useServerTable = <T,>(endpoint: string, options: UseServerTableOpti
       limit: String(limit),
       search: debouncedSearch
     })
+    const extra = JSON.parse(extraKey) as Record<string, string>
 
-    Object.entries(options.extraParams || {}).forEach(([key, value]) => {
+    Object.entries(extra).forEach(([key, value]) => {
       if (value) params.set(key, value)
     })
 
-    const res = await fetch(`${endpoint}?${params.toString()}`)
-    const json = (await res.json()) as TableResponse<T>
+    const result = await adminApi<TableResponse<T>>(`${endpoint}?${params.toString()}`, undefined, {
+      silentSuccess: true,
+      errorMessage: 'Could not load data'
+    })
 
-    if (res.ok) {
-      setRows(json.data || [])
-      setTotal(json.total || 0)
+    if (result.ok) {
+      setRows(result.data?.data || [])
+      setTotal(result.data?.total || 0)
     }
 
     setLoading(false)
-  }, [debouncedSearch, endpoint, limit, options.extraParams, page])
+  }, [debouncedSearch, endpoint, extraKey, limit, page])
 
   useEffect(() => {
     void reload()

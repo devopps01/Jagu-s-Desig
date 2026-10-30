@@ -23,6 +23,7 @@ export type ConfirmActionDialogProps = {
   message: string
   confirmLabel?: string
   cancelLabel?: string
+  icon?: string
   loading?: boolean
   onConfirm: () => void
   onClose: () => void
@@ -34,6 +35,7 @@ const ConfirmActionDialog = ({
   message,
   confirmLabel = 'Remove',
   cancelLabel = 'Cancel',
+  icon = 'tabler-trash',
   loading = false,
   onConfirm,
   onClose
@@ -84,7 +86,7 @@ const ConfirmActionDialog = ({
           }
         }}
       >
-        <i className='tabler-trash text-3xl' />
+        <i className={`${icon} text-3xl`} />
       </Box>
       <Typography id='confirm-action-title' variant='h5' className='mbe-2'>
         {title}

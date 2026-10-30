@@ -67,13 +67,15 @@ const RentPreviewDialog = ({
   booking,
   product,
   onClose,
-  onEdit
+  onEdit,
+  onBill
 }: {
   open: boolean
   booking: RentBooking | null
   product?: PreviewProduct | null
   onClose: () => void
   onEdit: () => void
+  onBill: () => void
 }) => {
   if (!booking) return null
 
@@ -117,15 +119,27 @@ const RentPreviewDialog = ({
           </div>
           <div className='flex flex-col gap-3'>
             <InfoRow label='Period' value={`${booking.startDate} ${booking.startTime || ''} → ${booking.endDate} ${booking.endTime || ''}`} />
+            <InfoRow label='Product price' value={booking.productPrice ? formatPrice(booking.productPrice) : ''} />
+            <InfoRow label='Final price' value={booking.finalPrice ? formatPrice(booking.finalPrice) : ''} />
+            <InfoRow
+              label='Payment'
+              value={`${booking.paymentOption === 'half' ? 'Half payment' : booking.paymentOption === 'full' ? 'Full payment' : booking.paymentOption === 'custom' ? 'Custom amount' : 'Not paid'}${booking.paymentMethod ? ` · ${booking.paymentMethod}` : ''}`}
+            />
+            <InfoRow label='Received' value={formatPrice(booking.paidAmount || 0)} />
+            <InfoRow label='Left to collect' value={formatPrice(booking.balanceAmount || 0)} />
+            <InfoRow label='Payment note' value={booking.paymentNote} />
             <InfoRow label='Customer' value={booking.customerName} />
             <InfoRow label='Phone' value={booking.customerPhone} />
             <InfoRow label='Email' value={booking.customerEmail} />
             <InfoRow label='Notes' value={booking.notes} />
           </div>
           <Divider />
-          <div className='flex justify-end gap-3'>
+          <div className='flex flex-wrap justify-end gap-3'>
             <Button variant='tonal' color='secondary' onClick={onClose}>
               Close
+            </Button>
+            <Button variant='tonal' startIcon={<i className='tabler-receipt' />} onClick={onBill}>
+              Bill
             </Button>
             <Button variant='contained' startIcon={<i className='tabler-edit' />} onClick={onEdit}>
               Edit

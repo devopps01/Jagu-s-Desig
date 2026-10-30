@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -18,6 +18,8 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 
 import { AdminDataTable, useServerTable } from '@admin/components/table'
+import { useConfirmDelete } from '@admin/hooks/useConfirmDelete'
+import { adminApi, adminMutate } from '@admin/libs/adminApi'
 import { printInvoice, type InvoiceOrder } from '@admin/views/orderInvoice'
 import { formatPrice } from '@web/data/catalog'
 import type { OrderStatus, PaymentStatus } from '@/libs/orders'
@@ -44,6 +46,8 @@ const nextStatus: Partial<Record<OrderStatus, OrderStatus>> = {
 
 const statusLabel = (status: string) => flow.find(item => item.id === status)?.label || status
 
+const canCancel = (status: string) => ['pending', 'confirmed', 'packed', 'shipped'].includes(status)
+
 const statusColor = (status: string) => {
   if (status === 'delivered') return 'success'
   if (status === 'cancelled' || status === 'returned') return 'default'
@@ -53,7 +57,68 @@ const statusColor = (status: string) => {
   return 'secondary'
 }
 
+type FlowStepProps = {
+  item: (typeof flow)[number]
+  count: number
+  active: boolean
+  onSelect: () => void
+}
+
+const OrderFlowStep = ({ item, count, active, onSelect }: FlowStepProps) => (
+  <Box
+    component='button'
+    type='button'
+    onClick={onSelect}
+    title={item.hint}
+    sx={{
+      flex: '0 0 auto',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 1,
+      minWidth: 0,
+      px: 1.25,
+      py: 0.75,
+      border: 1,
+      borderColor: active ? 'primary.main' : 'divider',
+      borderRadius: 1.5,
+      cursor: 'pointer',
+      bgcolor: active ? 'primary.main' : 'transparent',
+      color: active ? 'primary.contrastText' : 'text.primary',
+      transition: theme => theme.transitions.create(['background-color', 'border-color']),
+      '&:hover': {
+        borderColor: 'primary.main',
+        bgcolor: active ? 'primary.dark' : 'action.hover'
+      }
+    }}
+  >
+    <i className={`${item.icon} text-base shrink-0`} style={{ opacity: active ? 1 : 0.75 }} />
+    <Typography variant='body2' className='font-medium leading-none whitespace-nowrap'>
+      {item.label}
+    </Typography>
+    <Box
+      component='span'
+      sx={{
+        minWidth: 22,
+        height: 20,
+        px: 0.75,
+        borderRadius: 1,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '0.75rem',
+        fontWeight: 700,
+        lineHeight: 1,
+        bgcolor: active ? 'rgba(255,255,255,0.22)' : 'action.selected',
+        color: active ? 'inherit' : 'text.primary'
+      }}
+    >
+      {count}
+    </Box>
+  </Box>
+)
+
 const OrderManager = () => {
+  const { askDelete, confirmDialog } = useConfirmDelete()
   const [statusFilter, setStatusFilter] = useState('')
   const [paymentFilter, setPaymentFilter] = useState('')
   const extraParams = useMemo(() => ({ status: statusFilter, payment: paymentFilter }), [paymentFilter, statusFilter])
@@ -62,10 +127,9 @@ const OrderManager = () => {
   const [counts, setCounts] = useState<Record<string, number>>({ all: 0 })
 
   const loadCounts = async () => {
-    const res = await fetch('/api/admin/orders?counts=1')
-    const json = await res.json()
+    const result = await adminApi<Record<string, number>>('/api/admin/orders?counts=1', undefined, { silentSuccess: true })
 
-    if (res.ok) setCounts(json)
+    if (result.ok) setCounts(result.data)
   }
 
   useEffect(() => {
@@ -73,19 +137,37 @@ const OrderManager = () => {
   }, [table.rows])
 
   const patch = async (id: string, payload: { status?: OrderStatus; payment?: PaymentStatus }) => {
-    await fetch(`/api/admin/orders/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
+    await adminMutate(
+      `/api/admin/orders/${id}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      },
+      { successMessage: payload.status === 'cancelled' ? 'Order cancelled' : 'Order updated' }
+    )
     await table.reload()
     await loadCounts()
     if (open?.id === id) {
-      const res = await fetch(`/api/admin/orders/${id}`)
-      const json = await res.json()
+      const result = await adminApi<OrderRow>(`/api/admin/orders/${id}`, undefined, { silentSuccess: true })
 
-      if (res.ok) setOpen(json)
+      if (result.ok) setOpen(result.data)
     }
+  }
+
+  const cancelOrder = (row: OrderRow) => {
+    const paid = row.payment === 'paid'
+
+    askDelete({
+      title: 'Cancel this order?',
+      message: paid
+        ? `${row.orderNo} will be cancelled and the payment marked as refunded. Those outfits can be sold again.`
+        : `${row.orderNo} will be cancelled. Those outfits can be sold again.`,
+      confirmLabel: 'Yes, cancel order',
+      cancelLabel: 'Keep order',
+      icon: 'tabler-circle-x',
+      onConfirm: () => patch(row.id, { status: 'cancelled' })
+    })
   }
 
   const setFilter = (status: string) => {
@@ -104,34 +186,33 @@ const OrderManager = () => {
             <Typography color='text.secondary' className='mbe-4'>
               Filter by status. Move an order along New → Confirmed → Packed → Shipped → Delivered.
             </Typography>
-            <Box className='flex flex-wrap gap-3'>
-              {flow.map((item, index) => {
+            <Box
+              sx={{
+                display: 'flex',
+                flexWrap: 'nowrap',
+                alignItems: 'center',
+                gap: 1,
+                width: '100%',
+                overflowX: 'auto',
+                pb: 0.5,
+                scrollbarWidth: 'thin'
+              }}
+            >
+              {flow.map(item => {
                 const count = item.id ? counts[item.id] || 0 : counts.all || 0
                 const active = statusFilter === item.id
+                const showDivider = item.id === 'cancelled'
 
                 return (
-                  <Box key={item.label} className='flex items-center gap-3'>
-                    {index > 0 && index < flow.length - 1 ? (
-                      <i className='tabler-chevron-right text-xl text-textDisabled hidden md:inline' />
+                  <Fragment key={item.label}>
+                    {showDivider ? (
+                      <Box
+                        aria-hidden
+                        sx={{ width: '1px', height: 22, flexShrink: 0, bgcolor: 'divider', mx: 0.25 }}
+                      />
                     ) : null}
-                    {index === flow.length - 1 ? <i className='tabler-minus text-xl text-textDisabled hidden md:inline' /> : null}
-                    <Button
-                      variant={active ? 'contained' : 'tonal'}
-                      color={item.id === 'cancelled' ? 'secondary' : active ? 'primary' : 'secondary'}
-                      onClick={() => setFilter(item.id)}
-                      sx={{ minWidth: 128, justifyContent: 'flex-start', textTransform: 'none', py: 2 }}
-                    >
-                      <Box className='flex items-center gap-3 text-start'>
-                        <i className={`${item.icon} text-xl`} />
-                        <Box>
-                          <Typography className='font-medium leading-none'>{item.label}</Typography>
-                          <Typography variant='caption' sx={{ opacity: 0.8 }}>
-                            {count} · {item.hint}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </Button>
-                  </Box>
+                    <OrderFlowStep item={item} count={count} active={active} onSelect={() => setFilter(item.id)} />
+                  </Fragment>
                 )
               })}
             </Box>
@@ -189,12 +270,6 @@ const OrderManager = () => {
                       Coupon {row.discountCode || ''} − {formatPrice(row.discountAmount)}
                     </Typography>
                   ) : null}
-                  {row.sisterName ? (
-                    <Typography variant='caption' display='block'>
-                      Sister {row.sisterName}
-                      {row.sisterDiscountAmount ? ` − ${formatPrice(row.sisterDiscountAmount)}` : ''}
-                    </Typography>
-                  ) : null}
                 </div>
               )
             },
@@ -231,10 +306,12 @@ const OrderManager = () => {
 
                 if (!next) return '—'
 
+                const step = flow.find(item => item.id === next)
+
                 return (
-                  <Button size='small' variant='tonal' onClick={() => void patch(row.id, { status: next })}>
-                    Mark {statusLabel(next)}
-                  </Button>
+                  <IconButton size='small' color='primary' title={`Mark ${statusLabel(next)}`} aria-label={`Mark ${statusLabel(next)}`} onClick={() => void patch(row.id, { status: next })}>
+                    <i className={step?.icon || 'tabler-arrow-right'} />
+                  </IconButton>
                 )
               }
             },
@@ -249,6 +326,11 @@ const OrderManager = () => {
                   <IconButton size='small' onClick={() => printInvoice(row)} aria-label='Print'>
                     <i className='tabler-printer' />
                   </IconButton>
+                  {canCancel(row.status) ? (
+                    <IconButton size='small' color='error' aria-label='Cancel order' title='Cancel order' onClick={() => cancelOrder(row)}>
+                      <i className='tabler-circle-x' />
+                    </IconButton>
+                  ) : null}
                 </>
               )
             }
@@ -278,9 +360,6 @@ const OrderManager = () => {
                 .filter(Boolean)
                 .join(', ')}
             </Typography>
-            {open.sisterName ? (
-              <Typography color='text.secondary'>Referral sister: {open.sisterName}</Typography>
-            ) : null}
             {open.items.map(item => (
               <Typography key={`${item.title}-${item.qty}-${item.lineTotal}`} variant='body2'>
                 {item.title}
@@ -308,7 +387,7 @@ const OrderManager = () => {
               ) : null}
               {open.sisterDiscountAmount ? (
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', color: '#1f7a4d' }}>
-                  <span>Sister offer</span>
+                  <span>Extra offer</span>
                   <strong>− {formatPrice(open.sisterDiscountAmount)}</strong>
                 </Box>
               ) : null}
@@ -338,7 +417,16 @@ const OrderManager = () => {
                     key={item.id}
                     size='small'
                     variant={open.status === item.id ? 'contained' : 'outlined'}
-                    onClick={() => void patch(open.id, { status: item.id as OrderStatus })}
+                    onClick={() => {
+                      if (item.id === open.status) return
+                      if (item.id === 'cancelled') {
+                        if (canCancel(open.status)) cancelOrder(open)
+
+                        return
+                      }
+
+                      void patch(open.id, { status: item.id as OrderStatus })
+                    }}
                   >
                     {item.label}
                   </Button>
@@ -374,6 +462,7 @@ const OrderManager = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      {confirmDialog}
     </Grid>
   )
 }
